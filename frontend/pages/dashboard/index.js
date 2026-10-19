@@ -50,7 +50,7 @@ export default function Dashboard() {
   const recentOrders = [...live].sort((a, b) => b.waktuMasuk.localeCompare(a.waktuMasuk)).slice(0, 6);
 
   const prodToday = live.filter((o) => o.tanggalProduksi === today);
-  const attention = live.filter((o) => o.needsNego || ['Berisiko', 'Terlambat'].includes(o.statusOtomatis));
+  const attention = live.filter((o) => o.needsNego || o.backendStatus === 'at_risk' || o.statusOtomatis === 'Terlambat');
 
   const t = todayLoad.data;
   const used = t?.used ?? 0;
@@ -58,7 +58,7 @@ export default function Dashboard() {
   const pct = capacity ? Math.round((used / capacity) * 100) : 0;
 
   const range = `${fmtTgl(from)} – ${fmtTgl(to)}`;
-  const attentionNote = (o) => (o.needsNego ? 'menunggu konfirmasi jam kirim' : o.statusOtomatis === 'Berisiko' ? 'belum mulai diproduksi' : 'lewat jam kirim');
+  const attentionNote = (o) => (o.needsNego ? 'menunggu konfirmasi jam kirim' : o.backendStatus === 'at_risk' ? 'belum dicetak / mulai diproduksi' : 'lewat jam kirim');
 
   return (
     <div className="flex flex-col min-h-full">

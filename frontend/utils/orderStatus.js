@@ -41,21 +41,19 @@ export function hLabel(tanggalKirim, tanggalProduksi) {
 /**
  * Status backend -> label UI.
  *   baru / menunggu_negosiasi -> Diterima   (di luar jendela 72 jam)
- *   terjadwal                 -> Dijadwalkan, atau Diproduksi bila hari produksinya tiba
- *   diproduksi                -> Diproduksi
- *   at_risk                   -> Berisiko     (hari ini belum mulai diproduksi)
+ *   terjadwal / at_risk       -> Dijadwalkan  (at_risk tidak diberi badge sendiri)
+ *   diproduksi                -> Diproduksi   (setelah pesanan dicetak / "Mulai produksi")
  *   terlambat                 -> Terlambat    (lewat jam kirim, belum diselesaikan)
  *   selesai / batal           -> Selesai / Dibatalkan
  */
-export function uiStatus(o, today = ymd()) {
+export function uiStatus(o) {
   switch (o.status) {
     case 'batal':      return 'Dibatalkan';
     case 'selesai':    return 'Selesai';
     case 'terlambat':  return 'Terlambat';
-    case 'at_risk':    return 'Berisiko';
     case 'diproduksi': return 'Diproduksi';
     case 'terjadwal':
-      return o.production_day && o.production_day <= today ? 'Diproduksi' : 'Dijadwalkan';
+    case 'at_risk':    return 'Dijadwalkan';
     default:           return 'Diterima';
   }
 }
@@ -67,6 +65,5 @@ export const badgeMap = {
   'Diproduksi':  `${base} bg-[#fff0e0] text-[#c2410c]`,
   'Selesai':     `${base} bg-[#dcfce7] text-[#166534]`,
   'Dibatalkan':  `${base} bg-[#fee2e2] text-[#991b1b]`,
-  'Berisiko':    `${base} bg-[#fdf6ec] text-[#a66a17] border border-[#e8c98a]`,
   'Terlambat':   `${base} bg-[#fee2e2] text-[#b74b40] border border-[#f3b8b2]`,
 };
