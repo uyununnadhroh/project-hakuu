@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { iconArrowUpRight, iconClipboardList } from '../../utils/icons';
+import { iconArrowUpRight } from '../../utils/icons';
 import api from '../../services/bakery';
 import { toUiOrder, penanggungJawab } from '../../utils/mapper';
 import { useLoad } from '../../utils/useLoad';
@@ -242,9 +242,6 @@ export default function DaftarPesanan() {
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(t); }, []);
 
   const list = orders || [];
-  const aktif = list.filter((o) => !['Dibatalkan', 'Selesai'].includes(o.statusOtomatis));
-  const totalBox = aktif.reduce((s, o) => s + o.qty, 0);
-  const totalBeban = aktif.reduce((s, o) => s + o.beban, 0);
 
   const inTab = (o, tab) => {
     if (tab === 'Semua') return o.statusOtomatis !== 'Dibatalkan';
@@ -340,14 +337,6 @@ export default function DaftarPesanan() {
         </div>
 
         <ErrorBanner message={error || actionErr} />
-
-        <div className="card p-5 flex items-center gap-6">
-          <img src={iconClipboardList} alt="" className="size-5 shrink-0" />
-          <p className="flex-1 text-sm font-semibold text-[#2b1d16]">{aktif.length} pesanan aktif</p>
-          <p className="flex-1 text-sm text-[#2b1d16]">{totalBox} box produk</p>
-          <p className="flex-1 text-sm font-medium text-[#4c0c13]">{totalBeban} box beban kapasitas</p>
-          <span className="bg-[#faf6ee] text-[#4c0c13] text-xs font-medium px-3 py-1.5 rounded-full whitespace-nowrap">Belum selesai / dibatalkan</span>
-        </div>
 
         <div className="card p-6 flex flex-col gap-5">
           <div className="flex gap-4 items-end">
