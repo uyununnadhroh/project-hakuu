@@ -28,6 +28,10 @@ type Service interface {
 	Transition(ctx context.Context, orderID int64, action, actor string) error
 	Schedule(ctx context.Context, fromStr string, days int) ([]bakery.DayView, error)
 
+	// konfirmasi pengiriman
+	DeliveryConfirmations(ctx context.Context) (*bakery.DeliveryView, error)
+	ConfirmDelivery(ctx context.Context, orderID int64, req bakery.ReqConfirmDelivery, actor bakery.Actor) error
+
 	// negosiasi
 	OfferToBuyer(ctx context.Context, offerID int64) (time.Time, error)
 	RespondOffer(ctx context.Context, offerID int64, accept bool) error

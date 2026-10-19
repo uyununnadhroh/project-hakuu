@@ -241,6 +241,48 @@ type DayView struct {
 	Orders   []OrderRow `json:"orders"`
 }
 
+// ======================= KONFIRMASI PENGIRIMAN =======================
+
+// ReqConfirmDelivery POST /api/delivery-confirmations/{id} (id = order).
+type ReqConfirmDelivery struct {
+	Status string `json:"status"` // selesai | belum_terkirim
+	Alasan string `json:"alasan"` // opsional, hanya untuk belum_terkirim
+}
+
+// DeliveryConfirmation konfirmasi terakhir sebuah pesanan.
+type DeliveryConfirmation struct {
+	Status string    `json:"status"`
+	Alasan string    `json:"alasan,omitempty"`
+	Waktu  string    `json:"waktu"`
+	Oleh   string    `json:"oleh,omitempty"`
+	At     time.Time `json:"-"`
+}
+
+type DeliveryOrder struct {
+	ID         int64                 `json:"id"`
+	Kode       string                `json:"kode"`
+	Customer   string                `json:"customer"`
+	Products   string                `json:"products"`
+	DeliverAt  string                `json:"deliver_at"`
+	Status     string                `json:"status"`     // status pesanan
+	Konfirmasi *DeliveryConfirmation `json:"konfirmasi"` // nil = belum dikonfirmasi
+	Kirim      time.Time             `json:"-"`
+}
+
+type DeliveryBatch struct {
+	Key        string          `json:"key"` // pagi | malam | sebelumnya
+	Label      string          `json:"label"`
+	Keterangan string          `json:"keterangan"`
+	Orders     []DeliveryOrder `json:"orders"`
+}
+
+// DeliveryView GET /api/delivery-confirmations: hanya batch yang sudah dibuka.
+type DeliveryView struct {
+	Date    string          `json:"date"`
+	Batches []DeliveryBatch `json:"batches"`
+	Pending int             `json:"pending"` // pesanan di batch terbuka yang belum Selesai (notifikasi aktif bila > 0)
+}
+
 // ======================= MASTER DATA =======================
 
 type Product struct {

@@ -86,6 +86,20 @@ const deleteCategory = async (nama) => {
 };
 
 // =============================================================================================
+// Konfirmasi pengiriman
+// =============================================================================================
+// respons: { date, pending, batches: [{ key, label, keterangan, orders: [{ id, kode, customer, products,
+//            deliver_at, status, konfirmasi: { status, alasan, waktu, oleh } | null }] }] }
+const getDeliveryConfirmations = async () => {
+    return await apiClient.get("/api/delivery-confirmations");
+};
+
+// status: "selesai" | "belum_terkirim"; alasan opsional (hanya untuk belum_terkirim)
+const confirmDelivery = async (orderId, status, alasan = "") => {
+    return await apiClient.post(`/api/delivery-confirmations/${orderId}`, { status, alasan });
+};
+
+// =============================================================================================
 // Notifikasi
 // =============================================================================================
 // respons: [{ id, pesan, waktu }] (hanya yang belum dibaca)
@@ -133,6 +147,8 @@ export default {
     deleteCategory,
     getNotifications,
     readNotifications,
+    getDeliveryConfirmations,
+    confirmDelivery,
     getMonthlyReport,
     exportMonthlyReport,
     closeMonth,

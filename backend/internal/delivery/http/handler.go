@@ -42,6 +42,10 @@ func (s *Server) Handler() *mux.Router {
 	p.HandleFunc("/orders/{id}/{action}", s.Bakery.OrderAction).Methods("POST") // start, complete, cancel
 	p.HandleFunc("/schedule", s.Bakery.Schedule).Methods("GET")
 
+	// Konfirmasi pengiriman (batch pagi 11.00, malam 20.00)
+	p.HandleFunc("/delivery-confirmations", s.Bakery.DeliveryConfirmations).Methods("GET")
+	p.HandleFunc("/delivery-confirmations/{id}", s.Bakery.ConfirmDelivery).Methods("POST") // body: status, alasan
+
 	// Negosiasi
 	p.HandleFunc("/offers/{id}/offer", s.Bakery.OfferToBuyer).Methods("POST")
 	p.HandleFunc("/offers/{id}/respond", s.Bakery.RespondOffer).Methods("POST")

@@ -63,7 +63,7 @@ Frontend `hakuu-web` tidak perlu diubah. Database juga tidak berubah.
 
 ## Menjalankan (Windows PowerShell + XAMPP)
 1. Start MySQL di XAMPP. Database `bakery` sudah ada (dari `db/schema.sql`).
-   Database lama: jalankan juga `db/migrations_002_laporan.sql`, `db/migrations_003_frontend.sql`, `db/migrations_004_penanggung_jawab.sql`, `db/migrations_005_jam_kirim.sql`, dan `db/migrations_006_paket_varian.sql` (berurutan; 002–004 dan 006 cukup sekali).
+   Database lama: jalankan juga `db/migrations_002_laporan.sql`, `db/migrations_003_frontend.sql`, `db/migrations_004_penanggung_jawab.sql`, `db/migrations_005_jam_kirim.sql`, `db/migrations_006_paket_varian.sql`, dan `db/migrations_007_konfirmasi_pengiriman.sql` (berurutan; 002–004 dan 006 cukup sekali).
    Contoh paket pilih varian (Paket Hemat isi 2/3/4): `db/seed_paket_varian.sql` (opsional).
 2. Cek `files/etc/bakery-scheduler/bakery-scheduler.development.yaml`: DSN database dan ganti `jwt.secret`
    dengan string acak minimal 32 karakter.
@@ -113,6 +113,8 @@ Parameter `batas_pagi_jam` tidak dipakai lagi. Order lama yang sudah terjadwal d
 | POST | /api/reports/monthly/2026-10/close | Tutup bulan |
 | GET | /api/audit-log, /api/notifications | Jejak perubahan dan notifikasi |
 | POST | /api/notifications/read | Tandai notifikasi dibaca |
+| GET | /api/delivery-confirmations | Pesanan yang perlu dikonfirmasi pengirimannya (batch yang sudah dibuka) |
+| POST | /api/delivery-confirmations/{orderId} | Konfirmasi pengiriman: `{"status":"selesai"}` atau `{"status":"belum_terkirim","alasan":"..."}` |
 | GET/POST | /api/products · PATCH/DELETE /api/products/{id} | Produk |
 | GET/POST | /api/categories · DELETE /api/categories/{nama} | Kategori |
 | GET/POST | /api/customers | Pelanggan |
@@ -124,6 +126,13 @@ dan `variants` (daftar lengkap, menggantikan yang lama). Contoh:
 `{"maks_varian":3,"variants":[{"id":2,"nama":"Coklat"},{"nama":"Lava","opsi_label":"Isian selai","opsi_pilihan":["Stroberi","Nanas"]},{"nama":"Keju","aktif":false}]}`.
 Varian aktif minimal sebanyak `maks_varian`. Varian lama yang tidak dikirim dihapus, atau dinonaktifkan bila sudah pernah dipesan.
 `GET /api/products` mengirim semua varian beserta `aktif`; Input Pesanan hanya menampilkan yang aktif.
+
+Konfirmasi pengiriman: batch pagi dibuka 11.00 (kirim hari ini sebelum 11.00), batch malam 20.00
+(kirim hari ini mulai 11.00), ditambah pesanan 7 hari terakhir yang belum dikonfirmasi/belum terkirim.
+"Selesai" menutup pesanan dan tidak bisa diubah lagi; "Belum terkirim" (alasan opsional) masih bisa
+diubah ke "Selesai". Setiap konfirmasi disimpan di `delivery_confirmations` (status, waktu, user, alasan).
+Notifikasi (`pending`) tetap aktif selama ada pesanan di batch terbuka yang belum Selesai. Semua jam
+konfirmasi pengiriman dihitung dalam WIB (Asia/Jakarta), tidak terpengaruh `APP_TZ`.
 
 ## Menambah fitur baru (pola yang sama)
 1. Struct request/response → `internal/entity/bakery/bakery.go`

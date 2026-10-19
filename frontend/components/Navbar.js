@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { iconStore, iconBell } from "../utils/icons";
 import api from "../services/bakery";
+import KonfirmasiPengiriman from "./KonfirmasiPengiriman";
 
 // notifikasi diperbarui otomatis tiap 60 detik
 const POLL_MS = 60000;
@@ -64,6 +65,7 @@ const Navbar = ({ section = "Dashboard Admin" }) => {
             </div>
             <div className="flex gap-4 items-center">
                 <span className="text-[#8a7768] text-xs">{today}</span>
+                <KonfirmasiPengiriman />
                 <div className="relative" ref={boxRef}>
                     <button
                         type="button"

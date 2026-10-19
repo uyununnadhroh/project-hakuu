@@ -18,6 +18,10 @@ type BakeryHandler interface {
 	OrderAction(w http.ResponseWriter, r *http.Request)
 	Schedule(w http.ResponseWriter, r *http.Request)
 
+	// konfirmasi pengiriman
+	DeliveryConfirmations(w http.ResponseWriter, r *http.Request)
+	ConfirmDelivery(w http.ResponseWriter, r *http.Request)
+
 	// negosiasi
 	OfferToBuyer(w http.ResponseWriter, r *http.Request)
 	RespondOffer(w http.ResponseWriter, r *http.Request)

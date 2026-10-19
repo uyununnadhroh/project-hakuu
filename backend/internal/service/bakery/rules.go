@@ -308,3 +308,68 @@ func NormVariants(maks int, in []bakery.VariantInput) ([]bakery.ProductVariant, 
 	}
 	return out, nil
 }
+
+// ------------------------- KONFIRMASI PENGIRIMAN -------------------------
+
+const (
+	JamBatchPagi  = 11 // dibuka 11.00 WIB: pesanan kirim hari ini sebelum 11.00
+	JamBatchMalam = 20 // dibuka 20.00 WIB: pesanan kirim hari ini mulai 11.00
+)
+
+// WIB zona waktu semua perhitungan konfirmasi pengiriman (Asia/Jakarta, UTC+7,
+// tanpa musim panas), terlepas dari zona waktu server atau APP_TZ.
+var WIB = time.FixedZone("WIB", 7*60*60)
+
+// BatchKirim batch konfirmasi pengiriman untuk sebuah jam kirim: "pagi" atau "malam".
+func BatchKirim(kirim time.Time) string {
+	if kirim.In(WIB).Hour() < JamBatchPagi {
+		return "pagi"
+	}
+	return "malam"
+}
+
+// BatchDibuka apakah batch sudah boleh dikonfirmasi pada waktu now.
+func BatchDibuka(batch string, now time.Time) bool {
+	now = now.In(WIB)
+	switch batch {
+	case "pagi":
+		return now.Hour() >= JamBatchPagi
+	case "malam":
+		return now.Hour() >= JamBatchMalam
+	}
+	return false
+}
+
+// CheckDeliveryConfirm aturan konfirmasi pengiriman satu pesanan:
+//   - pilihan hanya "selesai" atau "belum_terkirim"
+//   - pesanan selesai tidak bisa diubah lagi; belum_terkirim boleh diubah ke selesai
+//   - pesanan batal / belum terjadwal tidak bisa dikonfirmasi
+//   - hanya untuk pesanan yang tanggal kirimnya sudah tiba dan batch-nya sudah dibuka
+//
+// Tanggal & jam dihitung dalam WIB.
+func CheckDeliveryConfirm(orderStatus, to string, kirim, now time.Time) error {
+	kirim, now = kirim.In(WIB), now.In(WIB)
+	if to != "selesai" && to != "belum_terkirim" {
+		return fmt.Errorf("%w: status konfirmasi harus selesai atau belum_terkirim", bakery.ErrValidation)
+	}
+	switch orderStatus {
+	case "selesai":
+		return fmt.Errorf("%w: pesanan sudah selesai dan tidak bisa diubah lagi", bakery.ErrState)
+	case "batal":
+		return fmt.Errorf("%w: pesanan sudah dibatalkan", bakery.ErrState)
+	case "baru", "menunggu_negosiasi":
+		return fmt.Errorf("%w: pesanan belum dijadwalkan", bakery.ErrState)
+	}
+	today, day := DayOf(now), DayOf(kirim)
+	if day.After(today) {
+		return fmt.Errorf("%w: pesanan baru dikirim %s", bakery.ErrState, day.Format("2006-01-02"))
+	}
+	if day.Equal(today) && !BatchDibuka(BatchKirim(kirim), now) {
+		jam := JamBatchPagi
+		if BatchKirim(kirim) == "malam" {
+			jam = JamBatchMalam
+		}
+		return fmt.Errorf("%w: konfirmasi batch %s dibuka mulai %02d.00", bakery.ErrState, BatchKirim(kirim), jam)
+	}
+	return nil
+}

@@ -158,6 +158,20 @@ CREATE TABLE audit_log (
   INDEX idx_audit_waktu (waktu)
 ) ENGINE=InnoDB;
 
+-- Konfirmasi pengiriman oleh penjual (batch pagi 11.00 & malam 20.00).
+-- Satu baris per konfirmasi; konfirmasi terakhir = status pengiriman saat ini.
+CREATE TABLE delivery_confirmations (
+  id                BIGINT AUTO_INCREMENT PRIMARY KEY,
+  order_id          BIGINT NOT NULL,
+  status            ENUM('selesai','belum_terkirim') NOT NULL,
+  alasan            VARCHAR(255) NULL,
+  dikonfirmasi_oleh BIGINT NULL,
+  dikonfirmasi_pada DATETIME NOT NULL,
+  INDEX idx_dc_order (order_id, id),
+  FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+  FOREIGN KEY (dikonfirmasi_oleh) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
 CREATE TABLE notifications (
   id          BIGINT AUTO_INCREMENT PRIMARY KEY,
   order_id    BIGINT NULL,

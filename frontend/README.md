@@ -19,6 +19,7 @@ components/          komponen yang dipakai bersama
   Sidebar.js         sidebar kiri (menu + tombol Keluar)
   Navbar.js          bar atas (Hakuu Bakery / nama halaman)
   ErrorBanner.js     kotak pesan error merah
+  KonfirmasiPengiriman.js  tombol + jendela konfirmasi pengiriman di Navbar (batch 11.00 & 20.00)
   pesanan/           komponen halaman Input Pesanan
     PackageCard.js   kartu paket pilih varian (qty + pilih varian)
     QtyStepper.js    stepper jumlah box (−, angka, +)

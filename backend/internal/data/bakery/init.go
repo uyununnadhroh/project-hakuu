@@ -49,6 +49,8 @@ var (
 		{getOrderOffers, qGetOrderOffers},
 		{getOrderHistory, qGetOrderHistory},
 		{getScheduleOrders, qGetScheduleOrders},
+		{getDeliveryOrders, qGetDeliveryOrders},
+		{getOrderDeliveryLock, qGetOrderDeliveryLock},
 
 		// negosiasi
 		{getOfferLock, qGetOfferLock},
@@ -98,6 +100,7 @@ var (
 		{insOrder, qInsOrder},
 		{insOrderItem, qInsOrderItem},
 		{insOrderItemVariant, qInsOrderItemVariant},
+		{insDeliveryConfirmation, qInsDeliveryConfirmation},
 		{insOffer, qInsOffer},
 		{upsertSetting, qUpsertSetting},
 		{insWeights, qInsWeights},

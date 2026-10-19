@@ -48,6 +48,9 @@ type BakeryData interface {
 	GetOrderProductionDay(ctx context.Context, tx *sqlx.Tx, id int64) (sql.NullString, error)
 	UpdateOrderStatus(ctx context.Context, tx *sqlx.Tx, id int64, status string) error
 	UpdateOrderDelivered(ctx context.Context, tx *sqlx.Tx, id int64, at time.Time) error
+	GetDeliveryOrders(ctx context.Context, from, to, pastFrom time.Time) ([]bakery.DeliveryOrder, error)
+	GetOrderDeliveryLock(ctx context.Context, tx *sqlx.Tx, id int64) (string, time.Time, error)
+	InsertDeliveryConfirmation(ctx context.Context, tx *sqlx.Tx, orderID int64, status, alasan string, userID int64, at time.Time) error
 	GetNewOrdersInWindow(ctx context.Context, tx *sqlx.Tx, until time.Time) ([]int64, error)
 	MarkLateOrders(ctx context.Context, tx *sqlx.Tx, now time.Time) error
 	GetOrdersForRescore(ctx context.Context, tx *sqlx.Tx) ([]bakery.ScoreRow, error)
