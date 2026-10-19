@@ -85,6 +85,35 @@ const deleteCategory = async (nama) => {
     return await apiClient.delete(`/api/categories/${enc(nama)}`);
 };
 
+// =============================================================================================
+// Notifikasi
+// =============================================================================================
+// respons: [{ id, pesan, waktu }] (hanya yang belum dibaca)
+const getNotifications = async () => {
+    return await apiClient.get("/api/notifications");
+};
+
+const readNotifications = async () => {
+    return await apiClient.post("/api/notifications/read");
+};
+
+// =============================================================================================
+// Laporan Bulanan
+// =============================================================================================
+// month: 'YYYY-MM'
+const getMonthlyReport = async (month) => {
+    return await apiClient.get(`/api/reports/monthly?month=${enc(month)}`);
+};
+
+// file CSV (Blob)
+const exportMonthlyReport = async (month) => {
+    return await apiClient.get(`/api/reports/monthly/export?month=${enc(month)}`, { responseType: "blob" });
+};
+
+const closeMonth = async (month) => {
+    return await apiClient.post(`/api/reports/monthly/${enc(month)}/close`);
+};
+
 export default {
     getOrders,
     getOrder,
@@ -102,4 +131,9 @@ export default {
     getCategories,
     insertCategory,
     deleteCategory,
+    getNotifications,
+    readNotifications,
+    getMonthlyReport,
+    exportMonthlyReport,
+    closeMonth,
 };

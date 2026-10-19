@@ -10,6 +10,8 @@ import ErrorBanner from '../../components/ErrorBanner';
           - daftar pesanan diambil dari /api/orders, lalu disaring per bulan (berdasarkan tanggal kirim)
           - alamat, rincian produk & total harga diambil dari detail /api/orders/:id
           - pesanan "Dibatalkan" tidak dihitung ke produksi maupun penghasilan
+          - ringkasan resmi, kinerja penjadwalan, unduh CSV & tutup bulan dari /api/reports/monthly
+            (backend hanya menghitung pesanan berstatus selesai)
 */
 
 const rp = (n) => `Rp ${Math.round(Number(n) || 0).toLocaleString('id-ID')}`;
@@ -24,6 +26,8 @@ function shiftMonth(ym, delta) {
   const d = new Date(y, m - 1 + delta, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
+
+const pctLabel = (v) => (v == null ? '—' : `${Number(v).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`);
 
 const monthLabel = (ym) => {
   const [y, m] = ym.split('-').map(Number);
@@ -54,6 +58,73 @@ function IconPrinter() {
       <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
       <rect x="6" y="14" width="12" height="8" />
     </svg>
+  );
+}
+
+/** Ringkasan resmi dari server: pesanan selesai, perbandingan bulan lalu, kinerja penjadwalan */
+function RingkasanServer({ report, loading, error }) {
+  if (error) return <ErrorBanner message={`Ringkasan server gagal dimuat: ${error}`} />;
+  if (!report) return loading ? <p className="text-[#8a7768] text-sm">Memuat ringkasan server…</p> : null;
+
+  const s = report.summary;
+  const sc = report.scheduling;
+  const chg = report.revenue_change_pct;
+  const status = report.order_status || {};
+  const metrik = [
+    { label: 'Tepat waktu', value: pctLabel(sc.on_time_pct), note: `${num(sc.on_time_orders)} dari ${num(sc.delivered_orders)} diserahkan` },
+    { label: 'Pemakaian kapasitas', value: pctLabel(sc.capacity_utilization_pct), note: `Lembur ${num(sc.overtime_days)} hari · ${num(sc.overtime_pcs)} unit` },
+    { label: 'Pesanan digeser / dimajukan', value: `${num(sc.orders_moved)} / ${num(sc.orders_advanced)}`, note: 'Penyesuaian jadwal otomatis' },
+    { label: 'Negosiasi jam kirim', value: `${num(sc.negotiation_accepted)} / ${num(sc.negotiation_offered)} diterima`, note: `${num(sc.negotiation_declined_or_expired)} ditolak / kedaluwarsa` },
+    { label: 'Pesanan ditolak', value: num(sc.orders_rejected), note: 'Kapasitas tidak tersedia' },
+  ];
+
+  return (
+    <div className="card break-inside-avoid">
+      <div className="flex items-start justify-between gap-4 px-6 py-4 border-b border-[#eadfd0]">
+        <div>
+          <p className="text-[#2b1d16] text-lg font-normal">Ringkasan resmi &amp; kinerja penjadwalan</p>
+          <p className="text-[#7e4722] text-xs mt-0.5">Dihitung server dari pesanan berstatus selesai</p>
+        </div>
+        {report.closed
+          ? <span className="bg-[#dcfce7] text-[#166534] text-xs font-medium px-2.5 py-1 rounded-lg shrink-0">Ditutup {report.closed_at}</span>
+          : <span className="bg-[#fcebc8] text-[#7e4722] text-xs font-medium px-2.5 py-1 rounded-lg shrink-0">Belum ditutup</span>}
+      </div>
+      <div className="grid grid-cols-4 gap-4 px-6 py-5 border-b border-[#eadfd0]">
+        <div>
+          <p className="text-[#8a7768] text-xs">Penghasilan (selesai)</p>
+          <p className="text-[#2b1d16] text-xl">{rp(s.revenue)}</p>
+          <p className={`text-xs ${chg == null ? 'text-[#8a7768]' : chg >= 0 ? 'text-[#327a52]' : 'text-[#b74b40]'}`}>
+            {chg == null ? 'Bulan lalu belum ada penjualan' : `${chg >= 0 ? '▲' : '▼'} ${pctLabel(Math.abs(chg))} dari bulan lalu (${rp(report.previous_month.revenue)})`}
+          </p>
+        </div>
+        <div>
+          <p className="text-[#8a7768] text-xs">Pesanan selesai</p>
+          <p className="text-[#2b1d16] text-xl">{num(s.orders)}</p>
+          <p className="text-[#8a7768] text-xs">{num(s.pcs)} unit kapasitas</p>
+        </div>
+        <div>
+          <p className="text-[#8a7768] text-xs">Rata-rata per pesanan</p>
+          <p className="text-[#2b1d16] text-xl">{rp(s.avg_order_value)}</p>
+        </div>
+        <div>
+          <p className="text-[#8a7768] text-xs">Status pesanan bulan ini</p>
+          <p className="text-[#2b1d16] text-sm mt-1">
+            {Object.keys(status).length
+              ? Object.entries(status).map(([k, v]) => `${k.replaceAll('_', ' ')} ${v}`).join(' · ')
+              : '—'}
+          </p>
+        </div>
+      </div>
+      <div className="grid grid-cols-5 gap-4 px-6 py-5">
+        {metrik.map((m) => (
+          <div key={m.label}>
+            <p className="text-[#8a7768] text-xs">{m.label}</p>
+            <p className="text-[#2b1d16] text-base font-semibold mt-0.5">{m.value}</p>
+            <p className="text-[#8a7768] text-xs mt-0.5">{m.note}</p>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -99,6 +170,42 @@ export default function LaporanPenjualan() {
     }).sort((a, b) => (a.tanggalKirim + a.jamKirim).localeCompare(b.tanggalKirim + b.jamKirim));
   }, [bulan]);
 
+  const report = useLoad(() => api.getMonthlyReport(bulan), [bulan]);
+  const [aksiErr, setAksiErr] = useState('');
+  const [aksiBusy, setAksiBusy] = useState('');
+
+  async function handleUnduhCsv() {
+    setAksiErr('');
+    setAksiBusy('csv');
+    try {
+      const blob = await api.exportMonthlyReport(bulan);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `laporan-${bulan}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setAksiErr(e.message);
+    } finally {
+      setAksiBusy('');
+    }
+  }
+
+  async function handleTutupBulan() {
+    if (!window.confirm(`Tutup laporan ${monthLabel(bulan)}? Ringkasan akan disimpan permanen dan tidak berubah lagi.`)) return;
+    setAksiErr('');
+    setAksiBusy('tutup');
+    try {
+      await api.closeMonth(bulan);
+      report.reload();
+    } catch (e) {
+      setAksiErr(e.message);
+    } finally {
+      setAksiBusy('');
+    }
+  }
+
   const rows = data || [];
   const sah = rows.filter((o) => o.statusOtomatis !== 'Dibatalkan');
   const batal = rows.length - sah.length;
@@ -133,6 +240,7 @@ export default function LaporanPenjualan() {
   const tampilSah = tampil.filter((o) => o.statusOtomatis !== 'Dibatalkan');
 
   const isCurrent = bulan === thisMonth();
+  const bisaTutup = bulan < thisMonth() && report.data && !report.data.closed;
   const adaGagal = rows.some((o) => o.detailGagal);
 
   function handleCetak() {
@@ -161,6 +269,16 @@ export default function LaporanPenjualan() {
             <p className="text-[#8a7768] text-sm mt-1.5">Rekap produksi dan penghasilan per bulan, dihitung dari tanggal kirim pesanan.</p>
           </div>
           <div className="flex gap-3 shrink-0">
+            {bisaTutup && (
+              <button onClick={handleTutupBulan} disabled={!!aksiBusy}
+                className="btn-secondary text-[#4c0c13] disabled:opacity-50">
+                {aksiBusy === 'tutup' ? 'Menutup…' : 'Tutup bulan'}
+              </button>
+            )}
+            <button onClick={handleUnduhCsv} disabled={!!aksiBusy}
+              className="btn-secondary text-[#4c0c13] disabled:opacity-50">
+              {aksiBusy === 'csv' ? 'Mengunduh…' : 'Unduh CSV'}
+            </button>
             <button onClick={handleCetak} disabled={loading || !data}
               className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
               <IconPrinter /> Cetak laporan
@@ -183,12 +301,12 @@ export default function LaporanPenjualan() {
           {!isCurrent && (
             <button onClick={() => setBulan(thisMonth())} className="text-[#4c0c13] text-xs font-semibold hover:underline">Kembali ke bulan ini</button>
           )}
-          <button onClick={reload} className="ml-auto border border-[#eadfd0] rounded-lg px-3 h-9 text-sm text-[#2b1d16] font-semibold hover:bg-[#faf6ee]">
+          <button onClick={() => { reload(); report.reload(); }} className="ml-auto border border-[#eadfd0] rounded-lg px-3 h-9 text-sm text-[#2b1d16] font-semibold hover:bg-[#faf6ee]">
             Muat ulang
           </button>
         </div>
 
-        <ErrorBanner message={error} />
+        <ErrorBanner message={error || aksiErr} />
         {adaGagal && (
           <div className="bg-[#fdf6ec] border border-[#e8c98a] rounded-xl px-5 py-3 text-sm text-[#a66a17] print:hidden">
             Rincian beberapa pesanan gagal dimuat, sehingga alamat dan total harganya belum lengkap. Tekan Muat ulang untuk mencoba lagi.
@@ -212,6 +330,8 @@ export default function LaporanPenjualan() {
           <StatCard label="Rata-rata per pesanan" value={rp(rata)}
             note={terlaris ? `Terlaris: ${terlaris.produk}` : 'Belum ada penjualan'} />
         </div>
+
+        <RingkasanServer report={report.data} loading={report.loading} error={report.error} />
 
         {/* Rekap produksi per produk */}
         <div className="card break-inside-avoid">

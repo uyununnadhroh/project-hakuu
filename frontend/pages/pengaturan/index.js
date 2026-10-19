@@ -32,7 +32,7 @@ function AkunTerdaftar() {
       const r = await apiCore.getUsers();
       return { users: Array.isArray(r) ? r : (r?.users ?? []), belumAda: false };
     } catch (e) {
-      // backend belum punya endpoint /api/users
+      // cadangan bila backend versi lama belum punya endpoint /api/users
       if (e.status === 404 || e.status === 405) return { users: [], belumAda: true };
       throw e;
     }

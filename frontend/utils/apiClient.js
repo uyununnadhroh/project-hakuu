@@ -32,7 +32,7 @@ apiClient.interceptors.request.use(
 
 apiClient.interceptors.response.use(
     (response) => response.data,
-    (error) => {
+    async (error) => {
         // backend tidak bisa dihubungi
         if (!error.response) {
             return Promise.reject(
@@ -40,7 +40,13 @@ apiClient.interceptors.response.use(
             );
         }
 
-        const { status, data } = error.response;
+        const { status } = error.response;
+        let { data } = error.response;
+
+        // request berjenis blob (mis. unduh CSV): pesan error tetap JSON, baca dulu isinya
+        if (typeof Blob !== "undefined" && data instanceof Blob) {
+            try { data = JSON.parse(await data.text()); } catch { data = null; }
+        }
 
         // sesi habis -> balik ke login
         if (status === 401 && error.config?.url !== "/api/login") {
