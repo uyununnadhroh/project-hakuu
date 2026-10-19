@@ -1,0 +1,14 @@
+server:
+    port: ":8080"
+    timezone: "Asia/Jakarta"
+database:
+    # XAMPP default: user root tanpa password. parseTime=true dan loc= WAJIB ada.
+    bakery: "root:@tcp(localhost:3306)/bakery?parseTime=true&loc=Asia%2FJakarta&charset=utf8mb4"
+jwt:
+    # ganti dengan string acak minimal 32 karakter
+    secret: "ganti-dengan-string-acak-minimal-32-karakter"
+cors:
+    # asal frontend yang diizinkan (Vite = 5173, Next.js = 3000)
+    origins:
+        - "http://localhost:5173"
+        - "http://localhost:3000"
