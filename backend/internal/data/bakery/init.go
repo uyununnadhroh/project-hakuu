@@ -45,6 +45,7 @@ var (
 		{getOrderByID, qGetOrderByID},
 		{getOrderExtra, qGetOrderExtra},
 		{getOrderItems, qGetOrderItems},
+		{getOrderItemVariants, qGetOrderItemVariants},
 		{getOrderOffers, qGetOrderOffers},
 		{getOrderHistory, qGetOrderHistory},
 		{getScheduleOrders, qGetScheduleOrders},
@@ -61,6 +62,8 @@ var (
 
 		// master
 		{listProducts, qListProducts},
+		{listProductVariants, qListProductVariants},
+		{getVariantsByProduct, qGetVariantsByProduct},
 		{countProductByID, qCountProductByID},
 		{countProductUsage, qCountProductUsage},
 		{listCategories, qListCategories},
@@ -92,6 +95,7 @@ var (
 		{insNotification, qInsNotification},
 		{insOrder, qInsOrder},
 		{insOrderItem, qInsOrderItem},
+		{insOrderItemVariant, qInsOrderItemVariant},
 		{insOffer, qInsOffer},
 		{upsertSetting, qUpsertSetting},
 		{insWeights, qInsWeights},

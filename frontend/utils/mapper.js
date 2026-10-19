@@ -50,5 +50,35 @@ export function toUiProduct(p) {
         kategori: p.kategori,
         jenis: JENIS_LABEL[p.jenis] || p.jenis,
         bobot: p.bobot,
+        // paket pilih varian: maxVariants > 0 = wajib memilih tepat sejumlah ini
+        maxVariants: p.maks_varian || 0,
+        variants: (p.variants || []).map((v) => ({
+            id: v.id,
+            name: v.nama,
+            optionLabel: v.opsi_label || "",
+            options: v.opsi_pilihan || [],
+        })),
     };
+}
+
+/** Pilihan varian satu paket sudah lengkap? (jumlah pas + opsi tambahan terisi) */
+export function variantsComplete(item) {
+    if (!item.maxVariants) return true;
+    const chosen = item.chosenVariants || [];
+    if (chosen.length !== item.maxVariants) return false;
+    return chosen.every((c) => {
+        const v = item.variants.find((x) => x.id === c.id);
+        return !v || v.options.length === 0 || !!c.opsi;
+    });
+}
+
+/** Teks varian terpilih untuk ringkasan, mis. "Coklat, Lava (Stroberi)" */
+export function variantSummary(item) {
+    return (item.chosenVariants || [])
+        .map((c) => {
+            const v = item.variants.find((x) => x.id === c.id);
+            const name = v ? v.name : `#${c.id}`;
+            return c.opsi ? `${name} (${c.opsi})` : name;
+        })
+        .join(", ");
 }

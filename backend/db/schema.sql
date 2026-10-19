@@ -30,7 +30,22 @@ CREATE TABLE products (
   aktif    BOOLEAN NOT NULL DEFAULT TRUE,
   kategori VARCHAR(60) NOT NULL DEFAULT 'Menu Hemat',
   jenis    ENUM('tanpa_topping','bertopping','campuran') NOT NULL DEFAULT 'tanpa_topping',
-  bobot    DECIMAL(4,2) NOT NULL DEFAULT 1.00   -- bobot kapasitas per box
+  bobot    DECIMAL(4,2) NOT NULL DEFAULT 1.00,  -- bobot kapasitas per box
+  maks_varian TINYINT NOT NULL DEFAULT 0       -- paket pilih varian: jumlah varian wajib dipilih (0 = bukan paket varian)
+) ENGINE=InnoDB;
+
+-- Varian yang bisa dipilih untuk paket (products.maks_varian > 0).
+-- opsi_label/opsi_pilihan: pilihan tambahan bila varian dipilih, mis. Lava -> 'Isian selai' ["Stroberi","Blueberry"].
+CREATE TABLE product_variants (
+  id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+  product_id   BIGINT NOT NULL,
+  nama         VARCHAR(60) NOT NULL,
+  opsi_label   VARCHAR(60) NULL,
+  opsi_pilihan JSON NULL,
+  aktif        BOOLEAN NOT NULL DEFAULT TRUE,
+  urutan       INT NOT NULL DEFAULT 0,
+  UNIQUE KEY uq_product_variant (product_id, nama),
+  FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE orders (
@@ -68,6 +83,16 @@ CREATE TABLE order_items (
   subtotal     DECIMAL(14,2) NOT NULL,
   FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
   FOREIGN KEY (product_id) REFERENCES products(id)
+) ENGINE=InnoDB;
+
+-- Varian yang dipilih per baris paket; berlaku untuk semua box di baris itu.
+CREATE TABLE order_item_variants (
+  id            BIGINT AUTO_INCREMENT PRIMARY KEY,
+  order_item_id BIGINT NOT NULL,
+  variant_id    BIGINT NOT NULL,
+  opsi          VARCHAR(60) NULL,
+  FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE CASCADE,
+  FOREIGN KEY (variant_id) REFERENCES product_variants(id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE daily_capacity (
@@ -160,4 +185,4 @@ CREATE TABLE IF NOT EXISTS monthly_reports (
 ) ENGINE=InnoDB;
 INSERT IGNORE INTO settings (kunci, nilai) VALUES ('jam_peringatan_sebelum_selesai','2');
 
-INSERT INTO categories (nama) VALUES ('Menu Hemat'), ('Menu Paket');
+INSERT INTO categories (nama) VALUES ('Menu Hemat'), ('Menu Paket'), ('Paket Pilih Varian');

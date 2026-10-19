@@ -19,6 +19,10 @@ components/          komponen yang dipakai bersama
   Sidebar.js         sidebar kiri (menu + tombol Keluar)
   Navbar.js          bar atas (Hakuu Bakery / nama halaman)
   ErrorBanner.js     kotak pesan error merah
+  pesanan/           komponen halaman Input Pesanan
+    PackageCard.js   kartu paket pilih varian (qty + pilih varian)
+    QtyStepper.js    stepper jumlah box (−, angka, +)
+    VariantPicker.js chip varian, batas maksimum, opsi tambahan (mis. isian selai)
 
 pages/               setiap file = satu halaman (URL)
   _app.js            kerangka aplikasi: cek login, pasang Sidebar + Navbar

@@ -184,3 +184,56 @@ func AHP(m [][]float64) (weights []float64, cr float64, err error) {
 	}
 	return weights, cr, nil
 }
+
+// CheckVariants memvalidasi pilihan varian satu baris order.
+//   - maks = 0 (produk biasa): tidak boleh ada varian.
+//   - maks > 0 (paket pilih varian): tepat maks varian, tanpa duplikat, semuanya
+//     milik paket itu; varian yang punya opsi tambahan wajib memilih salah satu
+//     opsinya, varian tanpa opsi tidak boleh membawa opsi.
+func CheckVariants(maks int, avail []bakery.ProductVariant, chosen []bakery.ItemVariant) error {
+	if maks <= 0 {
+		if len(chosen) > 0 {
+			return errors.New("produk ini tidak memakai varian")
+		}
+		return nil
+	}
+	if len(chosen) != maks {
+		return fmt.Errorf("pilih tepat %d varian (dipilih %d)", maks, len(chosen))
+	}
+	byID := make(map[int64]bakery.ProductVariant, len(avail))
+	for _, v := range avail {
+		byID[v.ID] = v
+	}
+	seen := make(map[int64]bool, len(chosen))
+	for _, c := range chosen {
+		v, ok := byID[c.VariantID]
+		if !ok {
+			return fmt.Errorf("varian %d tidak tersedia untuk paket ini", c.VariantID)
+		}
+		if seen[c.VariantID] {
+			return fmt.Errorf("varian %s dipilih lebih dari sekali", v.Nama)
+		}
+		seen[c.VariantID] = true
+		if len(v.OpsiPilihan) == 0 {
+			if c.Opsi != "" {
+				return fmt.Errorf("varian %s tidak punya pilihan tambahan", v.Nama)
+			}
+			continue
+		}
+		valid := false
+		for _, o := range v.OpsiPilihan {
+			if o == c.Opsi {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			label := v.OpsiLabel
+			if label == "" {
+				label = "pilihan"
+			}
+			return fmt.Errorf("pilih %s yang valid untuk varian %s", label, v.Nama)
+		}
+	}
+	return nil
+}

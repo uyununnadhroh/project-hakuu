@@ -11,7 +11,7 @@ const orderCols = `o.id, COALESCE(o.kode,''), c.nama, o.jumlah, o.qty_box,
 // Query List to Prepare
 const (
 	getProductPrice  = "GetProductPrice"
-	qGetProductPrice = `SELECT harga, aktif, bobot FROM products WHERE id = ?`
+	qGetProductPrice = `SELECT harga, aktif, bobot, maks_varian FROM products WHERE id = ?`
 
 	insOrder  = "InsOrder"
 	qInsOrder = `INSERT INTO orders (customer_id, jumlah, qty_box, total_harga, waktu_pesan, waktu_kirim, waktu_kirim_awal,
@@ -23,6 +23,9 @@ const (
 
 	insOrderItem  = "InsOrderItem"
 	qInsOrderItem = `INSERT INTO order_items (order_id, product_id, jumlah, harga_satuan, subtotal) VALUES (?,?,?,?,?)`
+
+	insOrderItemVariant  = "InsOrderItemVariant"
+	qInsOrderItemVariant = `INSERT INTO order_item_variants (order_item_id, variant_id, opsi) VALUES (?,?,?)`
 
 	updOrderNegotiation  = "UpdOrderNegotiation"
 	qUpdOrderNegotiation = `UPDATE orders SET status = 'menunggu_negosiasi', skor_j = ?, skor_q = ?, skor_w = ?,
@@ -99,9 +102,16 @@ const (
 				WHERE o.id = ?`
 
 	getOrderItems  = "GetOrderItems"
-	qGetOrderItems = `SELECT p.nama, i.jumlah, i.harga_satuan, i.subtotal
+	qGetOrderItems = `SELECT i.id, p.nama, i.jumlah, i.harga_satuan, i.subtotal
 				FROM order_items i JOIN products p ON p.id = i.product_id
 				WHERE i.order_id = ?`
+
+	getOrderItemVariants  = "GetOrderItemVariants"
+	qGetOrderItemVariants = `SELECT v.order_item_id, pv.nama, COALESCE(v.opsi,'')
+				FROM order_item_variants v
+				JOIN order_items i ON i.id = v.order_item_id
+				JOIN product_variants pv ON pv.id = v.variant_id
+				WHERE i.order_id = ? ORDER BY v.id`
 
 	getOrderOffers  = "GetOrderOffers"
 	qGetOrderOffers = `SELECT id, urutan, jam_alternatif, DATE_FORMAT(hari_produksi,'%Y-%m-%d'), status, batas_respons

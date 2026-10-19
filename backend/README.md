@@ -63,7 +63,8 @@ Frontend `hakuu-web` tidak perlu diubah. Database juga tidak berubah.
 
 ## Menjalankan (Windows PowerShell + XAMPP)
 1. Start MySQL di XAMPP. Database `bakery` sudah ada (dari `db/schema.sql`).
-   Database lama: jalankan juga `db/migrations_002_laporan.sql`, `db/migrations_003_frontend.sql`, `db/migrations_004_penanggung_jawab.sql`, dan `db/migrations_005_jam_kirim.sql` (berurutan; 002–004 cukup sekali).
+   Database lama: jalankan juga `db/migrations_002_laporan.sql`, `db/migrations_003_frontend.sql`, `db/migrations_004_penanggung_jawab.sql`, `db/migrations_005_jam_kirim.sql`, dan `db/migrations_006_paket_varian.sql` (berurutan; 002–004 dan 006 cukup sekali).
+   Contoh paket pilih varian (Paket Hemat isi 2/3/4): `db/seed_paket_varian.sql` (opsional).
 2. Cek `files/etc/bakery-scheduler/bakery-scheduler.development.yaml`: DSN database dan ganti `jwt.secret`
    dengan string acak minimal 32 karakter.
 3. Dari folder project:

@@ -4,7 +4,15 @@ package bakery
 const (
 	// ---------- produk ----------
 	listProducts  = "ListProducts"
-	qListProducts = `SELECT id, nama, harga, aktif, kategori, jenis, bobot FROM products ORDER BY id`
+	qListProducts = `SELECT id, nama, harga, aktif, kategori, jenis, bobot, maks_varian FROM products ORDER BY id`
+
+	listProductVariants  = "ListProductVariants"
+	qListProductVariants = `SELECT id, product_id, nama, COALESCE(opsi_label,''), opsi_pilihan
+				FROM product_variants WHERE aktif = TRUE ORDER BY product_id, urutan, id`
+
+	getVariantsByProduct  = "GetVariantsByProduct"
+	qGetVariantsByProduct = `SELECT id, product_id, nama, COALESCE(opsi_label,''), opsi_pilihan
+				FROM product_variants WHERE product_id = ? AND aktif = TRUE ORDER BY urutan, id`
 
 	countProductByID  = "CountProductByID"
 	qCountProductByID = `SELECT COUNT(*) FROM products WHERE id = ?`

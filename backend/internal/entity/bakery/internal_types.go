@@ -34,9 +34,10 @@ type OrderInsert struct {
 
 // ProductPrice harga, status aktif, dan bobot produk saat order dibuat.
 type ProductPrice struct {
-	Harga float64
-	Aktif bool
-	Bobot float64
+	Harga      float64
+	Aktif      bool
+	Bobot      float64
+	MaksVarian int
 }
 
 // Candidate reservasi order lain yang mungkin digeser.

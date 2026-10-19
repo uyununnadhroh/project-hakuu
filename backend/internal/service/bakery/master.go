@@ -44,8 +44,26 @@ func (s Service) categoryExists(ctx context.Context, nama string) (bool, error) 
 
 // ------------------------- PRODUK -------------------------
 
+// ListProducts daftar produk; paket pilih varian ikut membawa daftar variannya.
 func (s Service) ListProducts(ctx context.Context) ([]bakery.Product, error) {
-	return s.bakery.ListProducts(ctx)
+	list, err := s.bakery.ListProducts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	vars, err := s.bakery.ListProductVariants(ctx)
+	if err != nil {
+		return nil, err
+	}
+	idx := map[int64]int{}
+	for i, p := range list {
+		idx[p.ID] = i
+	}
+	for _, v := range vars {
+		if i, ok := idx[v.ProductID]; ok {
+			list[i].Variants = append(list[i].Variants, v)
+		}
+	}
+	return list, nil
 }
 
 // AddProduct menambah produk lengkap dengan kategori, jenis, dan bobot.

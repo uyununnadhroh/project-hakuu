@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"bakery-scheduler/internal/entity/bakery"
+
+	"github.com/jmoiron/sqlx"
 )
 
 // ------------------------- PRODUK -------------------------
@@ -20,10 +22,48 @@ func (d Data) ListProducts(ctx context.Context) ([]bakery.Product, error) {
 	out := []bakery.Product{}
 	for rows.Next() {
 		var p bakery.Product
-		if err := rows.Scan(&p.ID, &p.Nama, &p.Harga, &p.Aktif, &p.Kategori, &p.Jenis, &p.Bobot); err != nil {
+		if err := rows.Scan(&p.ID, &p.Nama, &p.Harga, &p.Aktif, &p.Kategori, &p.Jenis, &p.Bobot, &p.MaksVarian); err != nil {
 			return nil, err
 		}
+		p.Variants = []bakery.ProductVariant{}
 		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+// ListProductVariants semua varian aktif (untuk ditempel ke daftar produk).
+func (d Data) ListProductVariants(ctx context.Context) ([]bakery.ProductVariant, error) {
+	rows, err := (*d.stmt)[listProductVariants].QueryxContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return scanVariants(rows)
+}
+
+// GetVariantsByProduct varian aktif milik satu produk (dipakai validasi order).
+func (d Data) GetVariantsByProduct(ctx context.Context, tx *sqlx.Tx, productID int64) ([]bakery.ProductVariant, error) {
+	rows, err := d.st(ctx, tx, getVariantsByProduct).QueryxContext(ctx, productID)
+	if err != nil {
+		return nil, err
+	}
+	return scanVariants(rows)
+}
+
+func scanVariants(rows *sqlx.Rows) ([]bakery.ProductVariant, error) {
+	defer rows.Close()
+	out := []bakery.ProductVariant{}
+	for rows.Next() {
+		var v bakery.ProductVariant
+		var opsi []byte
+		if err := rows.Scan(&v.ID, &v.ProductID, &v.Nama, &v.OpsiLabel, &opsi); err != nil {
+			return nil, err
+		}
+		if len(opsi) > 0 {
+			if err := json.Unmarshal(opsi, &v.OpsiPilihan); err != nil {
+				return nil, err
+			}
+		}
+		out = append(out, v)
 	}
 	return out, rows.Err()
 }

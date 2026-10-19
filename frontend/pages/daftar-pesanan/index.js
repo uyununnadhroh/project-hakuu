@@ -84,8 +84,15 @@ function DetailModal({ order, onClose, onChanged }) {
                   <p className="flex-1">Produk</p><p className="w-16">Box</p><p className="w-24 text-right">Subtotal</p>
                 </div>
                 {d.items.map((it, i) => (
-                  <div key={i} className="flex px-4 h-11 items-center text-sm border-t border-[#eadfd0]">
-                    <p className="flex-1 text-[#2b1d16]">{it.produk}</p>
+                  <div key={i} className="flex px-4 min-h-11 py-2.5 items-center text-sm border-t border-[#eadfd0]">
+                    <div className="flex-1">
+                      <p className="text-[#2b1d16]">{it.produk}</p>
+                      {it.variants?.length > 0 && (
+                        <p className="text-xs text-[#7e4722]">
+                          {it.variants.map((v) => (v.opsi ? `${v.nama} (${v.opsi})` : v.nama)).join(', ')}
+                        </p>
+                      )}
+                    </div>
                     <p className="w-16 text-[#2b1d16]">{it.qty}</p>
                     <p className="w-24 text-right text-[#2b1d16]">{rp(it.subtotal)}</p>
                   </div>

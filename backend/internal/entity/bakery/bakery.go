@@ -91,6 +91,14 @@ type Actor struct {
 type Item struct {
 	ProductID int64 `json:"product_id"`
 	Qty       int   `json:"qty"`
+	// Variants wajib untuk paket pilih varian (jumlahnya = maks_varian produk),
+	// berlaku untuk semua box di baris ini. Produk biasa: kosong.
+	Variants []ItemVariant `json:"variants,omitempty"`
+}
+
+type ItemVariant struct {
+	VariantID int64  `json:"variant_id"`
+	Opsi      string `json:"opsi,omitempty"` // pilihan tambahan, mis. isian selai untuk Lava
 }
 
 type NewOrder struct {
@@ -158,10 +166,17 @@ type OrderRow struct {
 }
 
 type OrderItemView struct {
-	Produk      string  `json:"produk"`
-	Qty         int     `json:"qty"`
-	HargaSatuan float64 `json:"harga_satuan"`
-	Subtotal    float64 `json:"subtotal"`
+	ID          int64                  `json:"-"`
+	Produk      string                 `json:"produk"`
+	Qty         int                    `json:"qty"`
+	HargaSatuan float64                `json:"harga_satuan"`
+	Subtotal    float64                `json:"subtotal"`
+	Variants    []OrderItemVariantView `json:"variants,omitempty"`
+}
+
+type OrderItemVariantView struct {
+	Nama string `json:"nama"`
+	Opsi string `json:"opsi,omitempty"`
 }
 
 type OrderOfferView struct {
@@ -220,6 +235,17 @@ type Product struct {
 	Kategori string  `json:"kategori"`
 	Jenis    string  `json:"jenis"`
 	Bobot    float64 `json:"bobot"`
+	// MaksVarian > 0: paket pilih varian, pembeli wajib memilih tepat sejumlah ini.
+	MaksVarian int              `json:"maks_varian"`
+	Variants   []ProductVariant `json:"variants"`
+}
+
+type ProductVariant struct {
+	ID          int64    `json:"id"`
+	ProductID   int64    `json:"-"`
+	Nama        string   `json:"nama"`
+	OpsiLabel   string   `json:"opsi_label,omitempty"`   // mis. "Isian selai"
+	OpsiPilihan []string `json:"opsi_pilihan,omitempty"` // mis. ["Stroberi","Blueberry"]
 }
 
 type ProductInput struct {

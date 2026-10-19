@@ -13,7 +13,7 @@ import (
 // GetProductPrice mengembalikan sql.ErrNoRows bila produk tidak ada.
 func (d Data) GetProductPrice(ctx context.Context, tx *sqlx.Tx, productID int64) (bakery.ProductPrice, error) {
 	var p bakery.ProductPrice
-	err := d.st(ctx, tx, getProductPrice).QueryRowxContext(ctx, productID).Scan(&p.Harga, &p.Aktif, &p.Bobot)
+	err := d.st(ctx, tx, getProductPrice).QueryRowxContext(ctx, productID).Scan(&p.Harga, &p.Aktif, &p.Bobot, &p.MaksVarian)
 	return p, err
 }
 
@@ -31,8 +31,16 @@ func (d Data) UpdateOrderKode(ctx context.Context, tx *sqlx.Tx, id int64, kode s
 	return err
 }
 
-func (d Data) InsertOrderItem(ctx context.Context, tx *sqlx.Tx, orderID, productID int64, qty int, price float64) error {
-	_, err := d.st(ctx, tx, insOrderItem).ExecContext(ctx, orderID, productID, qty, price, price*float64(qty))
+func (d Data) InsertOrderItem(ctx context.Context, tx *sqlx.Tx, orderID, productID int64, qty int, price float64) (int64, error) {
+	r, err := d.st(ctx, tx, insOrderItem).ExecContext(ctx, orderID, productID, qty, price, price*float64(qty))
+	if err != nil {
+		return 0, err
+	}
+	return r.LastInsertId()
+}
+
+func (d Data) InsertOrderItemVariant(ctx context.Context, tx *sqlx.Tx, orderItemID, variantID int64, opsi string) error {
+	_, err := d.st(ctx, tx, insOrderItemVariant).ExecContext(ctx, orderItemID, variantID, nullStr(opsi))
 	return err
 }
 
@@ -255,12 +263,36 @@ func (d Data) GetOrderItems(ctx context.Context, id int64) ([]bakery.OrderItemVi
 	out := []bakery.OrderItemView{}
 	for rows.Next() {
 		var it bakery.OrderItemView
-		if err := rows.Scan(&it.Produk, &it.Qty, &it.HargaSatuan, &it.Subtotal); err != nil {
+		if err := rows.Scan(&it.ID, &it.Produk, &it.Qty, &it.HargaSatuan, &it.Subtotal); err != nil {
 			return nil, err
 		}
 		out = append(out, it)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// varian paket (bila ada) ditempel ke baris item-nya
+	vrows, err := (*d.stmt)[getOrderItemVariants].QueryxContext(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	defer vrows.Close()
+	idx := map[int64]int{}
+	for i, it := range out {
+		idx[it.ID] = i
+	}
+	for vrows.Next() {
+		var itemID int64
+		var v bakery.OrderItemVariantView
+		if err := vrows.Scan(&itemID, &v.Nama, &v.Opsi); err != nil {
+			return nil, err
+		}
+		if i, ok := idx[itemID]; ok {
+			out[i].Variants = append(out[i].Variants, v)
+		}
+	}
+	return out, vrows.Err()
 }
 
 func (d Data) GetOrderOffers(ctx context.Context, id int64) ([]bakery.OrderOfferView, error) {

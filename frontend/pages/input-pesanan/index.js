@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { iconIkonPengecekan } from '../../utils/icons';
 import api from '../../services/bakery';
-import { toUiProduct } from '../../utils/mapper';
+import { toUiProduct, variantsComplete, variantSummary } from '../../utils/mapper';
 import { useLoad } from '../../utils/useLoad';
 import ErrorBanner from '../../components/ErrorBanner';
+import PackageCard from '../../components/pesanan/PackageCard';
 import { fmtTgl, ymd } from '../../utils/orderStatus';
 import { getNama, getEmail } from '../../utils/storage';
 
@@ -133,6 +134,16 @@ function CapacitySidebar({ items, preview, onPilihJam }) {
               <div className="flex-1 min-w-0">
                 <p className="text-[#2b1d16] text-xs font-medium truncate">{item.name}</p>
                 <p className="text-[#8a7768] text-xs">×{item.qty} box</p>
+                {item.maxVariants > 0 && (
+                  <>
+                    {variantSummary(item) && <p className="text-[#7e4722] text-xs">{variantSummary(item)}</p>}
+                    {!variantsComplete(item) && (
+                      <span className="inline-flex mt-1 px-2 py-0.5 rounded-lg text-[11px] font-medium bg-[#fdf6ec] text-[#a66a17] border border-[#e8c98a]">
+                        Varian belum lengkap ({(item.chosenVariants || []).length}/{item.maxVariants})
+                      </span>
+                    )}
+                  </>
+                )}
               </div>
               <p className="text-[#2b1d16] text-xs font-semibold shrink-0">
                 Rp {(item.price * item.qty).toLocaleString('id-ID')}
@@ -176,6 +187,10 @@ export default function InputPesanan() {
   const catList = cats.data || [];
   const activeCat = activeMenuTab && catList.includes(activeMenuTab) ? activeMenuTab : catList[0];
   const allProducts = (prods.data || []).filter(p => p.kategori === activeCat);
+  // paket pilih varian tampil sebagai kartu; produk biasa tetap di tabel
+  const packages = allProducts.filter(p => p.maxVariants > 0);
+  const regularProducts = allProducts.filter(p => !p.maxVariants);
+  const variantsIncomplete = orderItems.some(i => !variantsComplete(i));
 
   const jamValid = /^([01]\d|2[0-3]):[0-5]\d$/.test(jamKirim);
   // Jam siap = produksi selesai + packing + perjalanan (default 10.00 + 30 + 30 menit = 11.00).
@@ -273,6 +288,15 @@ export default function InputPesanan() {
     if (qty <= 0) setOrderItems(orderItems.filter(i => i.id !== id));
     else          setOrderItems(orderItems.map(i => i.id === id ? { ...i, qty } : i));
   }
+  // paket: qty 0 menghapus baris (pilihan varian ikut di-reset)
+  function setPackageQty(p, qty) {
+    if (qty <= 0) setOrderItems(orderItems.filter(i => i.id !== p.id));
+    else if (orderItems.some(i => i.id === p.id)) setOrderItems(orderItems.map(i => i.id === p.id ? { ...i, qty } : i));
+    else setOrderItems([...orderItems, { ...p, qty, chosenVariants: [] }]);
+  }
+  function setPackageVariants(id, chosenVariants) {
+    setOrderItems(orderItems.map(i => i.id === id ? { ...i, chosenVariants } : i));
+  }
   function clearDraft(id) {
     setQtyDraft(d => { const n = { ...d }; delete n[id]; return n; });
   }
@@ -301,7 +325,13 @@ export default function InputPesanan() {
     try {
       const res = await api.insertOrder({
         customer: { nama: pembeli.trim(), telepon: telepon.trim(), alamat: alamat.trim() },
-        items: orderItems.map(i => ({ product_id: i.id, qty: i.qty })),
+        items: orderItems.map(i => ({
+          product_id: i.id,
+          qty: i.qty,
+          ...(i.maxVariants > 0 && {
+            variants: (i.chosenVariants || []).map(v => ({ variant_id: v.id, ...(v.opsi && { opsi: v.opsi }) })),
+          }),
+        })),
         deliver_at: `${tanggalKirim} ${jamKirim}`,
         note: catatan.trim(),
       });
@@ -536,7 +566,20 @@ export default function InputPesanan() {
                     ))}
                   </div>
 
+                  {/* Paket pilih varian */}
+                  {packages.length > 0 && (
+                    <div className="flex flex-col gap-3">
+                      {packages.map(p => (
+                        <PackageCard key={p.id} pkg={p}
+                          item={orderItems.find(i => i.id === p.id)}
+                          onQty={qty => setPackageQty(p, qty)}
+                          onVariants={v => setPackageVariants(p.id, v)} />
+                      ))}
+                    </div>
+                  )}
+
                   {/* Product list */}
+                  {(regularProducts.length > 0 || packages.length === 0) && (
                   <div className="flex flex-col gap-0">
                     {/* Table header */}
                     <div className="bg-[#faf6ee] flex items-center px-4 h-10 gap-4 rounded-t-xl border border-[#eadfd0]">
@@ -546,13 +589,13 @@ export default function InputPesanan() {
                       <p className="w-[120px] text-xs font-medium text-[#7e4722] text-center">Jumlah</p>
                     </div>
                     {prods.loading && !prods.data && <p className="text-[#8a7768] text-sm py-4">Memuat produk…</p>}
-                    {!prods.loading && allProducts.length === 0 && <p className="text-[#8a7768] text-sm py-4">Belum ada produk aktif di kategori ini.</p>}
-                    {allProducts.map((p, idx) => {
+                    {!prods.loading && regularProducts.length === 0 && <p className="text-[#8a7768] text-sm py-4">Belum ada produk aktif di kategori ini.</p>}
+                    {regularProducts.map((p, idx) => {
                       const inOrder = orderItems.find(i => i.id === p.id);
                       return (
                         <div key={p.id}
                           className={`flex items-center px-4 h-14 gap-4 border-l border-r border-b border-[#eadfd0] ${
-                            idx === allProducts.length - 1 ? 'rounded-b-xl' : ''
+                            idx === regularProducts.length - 1 ? 'rounded-b-xl' : ''
                           } hover:bg-[#faf6ee]/50 transition-colors`}>
                           <p className="flex-1 min-w-0 text-sm font-semibold text-[#2b1d16]">{p.name}</p>
                           <p className="w-[120px] text-sm text-[#2b1d16]">
@@ -597,10 +640,14 @@ export default function InputPesanan() {
                       );
                     })}
                   </div>
+                  )}
 
+                  {variantsIncomplete && (
+                    <p className="text-[#a66a17] text-xs">Lengkapi pilihan varian paket sebelum melanjutkan.</p>
+                  )}
                   <div className="flex gap-3 pt-2">
                     <button onClick={() => setStep(1)} className="btn-secondary">← Kembali</button>
-                    <button onClick={() => setStep(3)} disabled={orderItems.length === 0}
+                    <button onClick={() => setStep(3)} disabled={orderItems.length === 0 || variantsIncomplete}
                       className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
                       Lanjut ke Konfirmasi →
                     </button>
@@ -612,7 +659,10 @@ export default function InputPesanan() {
                 <div className="flex flex-col gap-2 text-sm">
                   {orderItems.map(i => (
                     <div key={i.id} className="flex justify-between">
-                      <span className="text-[#2b1d16]">{i.name} ×{i.qty}</span>
+                      <span className="text-[#2b1d16]">
+                        {i.name} ×{i.qty}
+                        {i.maxVariants > 0 && <span className="block text-xs text-[#7e4722]">{variantSummary(i) || 'Varian belum dipilih'}</span>}
+                      </span>
                       <span className="text-[#2b1d16] font-medium">
                         Rp {(i.price * i.qty).toLocaleString('id-ID')}
                       </span>
@@ -650,7 +700,7 @@ export default function InputPesanan() {
               )}
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setStep(2)} className="btn-secondary">← Kembali</button>
-                <button onClick={handleSimpan} disabled={saving} className="btn-primary flex-1 justify-center disabled:opacity-60">
+                <button onClick={handleSimpan} disabled={saving || variantsIncomplete || orderItems.length === 0} className="btn-primary flex-1 justify-center disabled:opacity-60">
                   {saving ? 'Menyimpan…' : 'Simpan Pesanan'}
                 </button>
               </div>

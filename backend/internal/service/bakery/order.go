@@ -19,6 +19,7 @@ type line struct {
 	ProductID int64
 	Qty       int
 	Price     float64
+	Variants  []bakery.ItemVariant
 }
 
 type orderRef struct {
@@ -91,10 +92,19 @@ func (s Service) priceItems(ctx context.Context, tx *sqlx.Tx, items []bakery.Ite
 		if err != nil {
 			return 0, 0, 0, nil, err
 		}
+		var avail []bakery.ProductVariant
+		if p.MaksVarian > 0 {
+			if avail, err = s.bakery.GetVariantsByProduct(ctx, tx, it.ProductID); err != nil {
+				return 0, 0, 0, nil, err
+			}
+		}
+		if err := CheckVariants(p.MaksVarian, avail, it.Variants); err != nil {
+			return 0, 0, 0, nil, fmt.Errorf("%w: produk %d: %v", bakery.ErrValidation, it.ProductID, err)
+		}
 		boxes += it.Qty
 		load += float64(it.Qty) * p.Bobot
 		total += p.Harga * float64(it.Qty)
-		lines = append(lines, line{it.ProductID, it.Qty, p.Harga})
+		lines = append(lines, line{it.ProductID, it.Qty, p.Harga, it.Variants})
 	}
 	return boxes, int(math.Ceil(load - 1e-9)), total, lines, nil
 }
@@ -175,8 +185,14 @@ func (s Service) acceptOnce(ctx context.Context, in bakery.NewOrder) (*bakery.Re
 		return nil, err
 	}
 	for _, l := range lines {
-		if err := s.bakery.InsertOrderItem(ctx, tx, id, l.ProductID, l.Qty, l.Price); err != nil {
+		itemID, err := s.bakery.InsertOrderItem(ctx, tx, id, l.ProductID, l.Qty, l.Price)
+		if err != nil {
 			return nil, err
+		}
+		for _, v := range l.Variants {
+			if err := s.bakery.InsertOrderItemVariant(ctx, tx, itemID, v.VariantID, v.Opsi); err != nil {
+				return nil, err
+			}
 		}
 	}
 	sc := ComputeScore(bakery.ScoreInput{Qty: qty, DeliverAt: in.DeliverAt, OrderedAt: now}, now, set)
