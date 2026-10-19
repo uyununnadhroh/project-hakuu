@@ -194,6 +194,10 @@ export default function InputPesanan() {
   const variantsIncomplete = orderItems.some(i => !variantsComplete(i));
 
   const jamValid = /^([01]\d|2[0-3]):[0-5]\d$/.test(jamKirim);
+  // Langkah di indikator hanya bisa diklik bila tombol "Lanjut" menuju langkah itu aktif.
+  const bisaLangkah2 = !!pembeli && !!tanggalKirim && jamValid;
+  const bisaLangkah3 = bisaLangkah2 && orderItems.length > 0 && !variantsIncomplete;
+  const bisaKeLangkah = { 1: true, 2: bisaLangkah2, 3: bisaLangkah3 };
   // Jam siap = produksi selesai + packing + perjalanan (default 10.00 + 30 + 30 menit = 11.00).
   // Hari H hanya boleh dipakai bila jam kirim >= jam siap.
   const prm = settings.data?.parameters || {};
@@ -428,7 +432,8 @@ export default function InputPesanan() {
           <div key={s.n} className="flex items-center gap-7">
             <button
               onClick={() => setStep(s.n)}
-              className={`text-sm font-semibold whitespace-pre transition-colors ${
+              disabled={!bisaKeLangkah[s.n]}
+              className={`text-sm font-semibold whitespace-pre transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                 step >= s.n ? 'text-[#4c0c13]' : 'text-[#8a7768] font-normal'
               }`}
             >
@@ -526,7 +531,7 @@ export default function InputPesanan() {
                   </div>
                   <button
                     onClick={() => setStep(2)}
-                    disabled={!pembeli || !tanggalKirim || !/^([01]\d|2[0-3]):[0-5]\d$/.test(jamKirim)}
+                    disabled={!bisaLangkah2}
                     className="btn-primary self-end disabled:opacity-50 disabled:cursor-not-allowed">
                     Lanjut ke Pilih Produk →
                   </button>
@@ -648,7 +653,7 @@ export default function InputPesanan() {
                   )}
                   <div className="flex gap-3 pt-2">
                     <button onClick={() => setStep(1)} className="btn-secondary">← Kembali</button>
-                    <button onClick={() => setStep(3)} disabled={orderItems.length === 0 || variantsIncomplete}
+                    <button onClick={() => setStep(3)} disabled={!bisaLangkah3}
                       className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
                       Lanjut ke Konfirmasi →
                     </button>
