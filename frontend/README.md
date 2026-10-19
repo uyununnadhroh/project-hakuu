@@ -23,6 +23,8 @@ components/          komponen yang dipakai bersama
     PackageCard.js   kartu paket pilih varian (qty + pilih varian)
     QtyStepper.js    stepper jumlah box (−, angka, +)
     VariantPicker.js chip varian, batas maksimum, opsi tambahan (mis. isian selai)
+  produk/            komponen halaman Kelola Produk
+    VariantEditor.js isi paket + daftar varian (tambah, hapus, aktif/nonaktif, pilihan tambahan)
 
 pages/               setiap file = satu halaman (URL)
   _app.js            kerangka aplikasi: cek login, pasang Sidebar + Navbar

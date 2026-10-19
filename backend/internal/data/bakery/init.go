@@ -64,6 +64,8 @@ var (
 		{listProducts, qListProducts},
 		{listProductVariants, qListProductVariants},
 		{getVariantsByProduct, qGetVariantsByProduct},
+		{getAllVariantsLock, qGetAllVariantsLock},
+		{countVariantUsage, qCountVariantUsage},
 		{countProductByID, qCountProductByID},
 		{countProductUsage, qCountProductUsage},
 		{listCategories, qListCategories},
@@ -100,6 +102,7 @@ var (
 		{upsertSetting, qUpsertSetting},
 		{insWeights, qInsWeights},
 		{insProduct, qInsProduct},
+		{insProductVariant, qInsProductVariant},
 		{insCategory, qInsCategory},
 		{insCustomer, qInsCustomer},
 		{insMonthlyReport, qInsMonthlyReport},
@@ -129,6 +132,8 @@ var (
 		{updProductKategori, qUpdProductKategori},
 		{updProductJenisBobot, qUpdProductJenisBobot},
 		{updProductBobot, qUpdProductBobot},
+		{updProductVariant, qUpdProductVariant},
+		{updProductMaksVarian, qUpdProductMaksVarian},
 		{updCustomerAlamat, qUpdCustomerAlamat},
 		{readNotifications, qReadNotifications},
 	}
@@ -137,6 +142,7 @@ var (
 		{delReservation, qDelReservation},
 		{delReservationByOrder, qDelReservationByOrder},
 		{delProduct, qDelProduct},
+		{delProductVariant, qDelProductVariant},
 		{delCategory, qDelCategory},
 	}
 )

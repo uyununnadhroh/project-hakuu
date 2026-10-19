@@ -39,3 +39,45 @@ func TestCheckVariants(t *testing.T) {
 		}
 	}
 }
+
+func TestNormVariants(t *testing.T) {
+	off := false
+	v := func(nama string, opsi ...string) bakery.VariantInput {
+		return bakery.VariantInput{Nama: nama, OpsiPilihan: opsi}
+	}
+	mati := bakery.VariantInput{Nama: "Abon", Aktif: &off}
+
+	cases := []struct {
+		name string
+		maks int
+		in   []bakery.VariantInput
+		ok   bool
+	}{
+		{"produk biasa tanpa varian", 0, nil, true},
+		{"produk biasa diberi varian", 0, []bakery.VariantInput{v("Coklat")}, false},
+		{"isi paket negatif", -1, nil, false},
+		{"isi paket terlalu besar", MaxIsiPaket + 1, nil, false},
+		{"paket pas", 2, []bakery.VariantInput{v("Coklat"), v("Keju")}, true},
+		{"varian aktif kurang", 3, []bakery.VariantInput{v("Coklat"), v("Keju"), mati}, false},
+		{"nama kosong", 1, []bakery.VariantInput{v("  ")}, false},
+		{"nama dobel beda huruf", 1, []bakery.VariantInput{v("Coklat"), v("coklat ")}, false},
+		{"opsi valid", 1, []bakery.VariantInput{v("Lava", "Stroberi", "Nanas")}, true},
+		{"opsi kosong", 1, []bakery.VariantInput{v("Lava", "Stroberi", " ")}, false},
+		{"opsi dobel", 1, []bakery.VariantInput{v("Lava", "Nanas", "nanas")}, false},
+	}
+	for _, c := range cases {
+		_, err := NormVariants(c.maks, c.in)
+		if (err == nil) != c.ok {
+			t.Errorf("%s: ok=%v, err=%v", c.name, c.ok, err)
+		}
+	}
+
+	// dirapikan: nama/opsi di-trim, label bawaan "Pilihan", aktif bawaan true
+	out, err := NormVariants(1, []bakery.VariantInput{{Nama: " Lava ", OpsiPilihan: []string{" Stroberi "}}, mati})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out[0].Nama != "Lava" || out[0].OpsiLabel != "Pilihan" || out[0].OpsiPilihan[0] != "Stroberi" || !out[0].Aktif || out[1].Aktif {
+		t.Errorf("hasil tidak dirapikan: %+v", out)
+	}
+}

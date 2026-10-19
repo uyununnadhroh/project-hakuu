@@ -3,17 +3,27 @@ import api from '../../services/bakery';
 import { JENIS_VALUE, toUiProduct } from '../../utils/mapper';
 import { useLoad } from '../../utils/useLoad';
 import ErrorBanner from '../../components/ErrorBanner';
+import VariantEditor, { toEditorVariant, toVariantPayload, variantProblem } from '../../components/produk/VariantEditor';
 
 // Toggle image URLs from Figma
-const imgToggleOn  = "https://www.figma.com/api/mcp/asset/00f6ff66-96de-494d-92c5-ecfb870358b6.svg";
-const imgToggleOff = "https://www.figma.com/api/mcp/asset/e6aedc64-44d0-4ff8-8478-bc850b154866.svg";
+const imgToggleOn  = "/assets/img-toggle-on.svg";
+const imgToggleOff = "/assets/img-toggle-off.svg";
+
+const PAKET_KATEGORI = 'Paket Pilih Varian';
 
 function ProductModal({ mode, product, cats, onClose, onSave }) {
-  const [form, setForm] = useState(
-    product
+  const [form, setForm] = useState(() => {
+    const base = product
       ? { ...product }
-      : { name: '', jenis: 'Tanpa topping', price: '', active: true, kategori: cats[0] || '' }
-  );
+      : { name: '', jenis: 'Tanpa topping', price: '', active: true, kategori: cats[0] || '', maxVariants: 0, variants: [] };
+    return {
+      ...base,
+      isPaket: base.maxVariants > 0 || (!product && base.kategori === PAKET_KATEGORI),
+      maxVariants: base.maxVariants > 0 ? String(base.maxVariants) : '',
+      variants: base.variants.map(toEditorVariant),
+    };
+  });
+  const paketProblem = form.isPaket ? variantProblem(form.maxVariants, form.variants) : '';
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
@@ -56,7 +66,11 @@ function ProductModal({ mode, product, cats, onClose, onSave }) {
           <div className="flex flex-col gap-2">
             <label className="text-[#2b1d16] text-sm">Kategori</label>
             <select className="input-field" value={form.kategori}
-              onChange={e => setForm(f => ({ ...f, kategori: e.target.value }))}>
+              onChange={e => {
+                const kategori = e.target.value;
+                // kategori paket otomatis menyalakan pengaturan varian
+                setForm(f => ({ ...f, kategori, isPaket: f.isPaket || kategori === PAKET_KATEGORI }));
+              }}>
               {cats.map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
@@ -74,6 +88,30 @@ function ProductModal({ mode, product, cats, onClose, onSave }) {
             <input className="input-field" type="number" value={form.price}
               onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
               placeholder="18000" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-[#2b1d16] text-sm">Tipe menu</label>
+            <div className="flex gap-3">
+              {[false, true].map(v => (
+                <button key={String(v)} type="button"
+                  onClick={() => setForm(f => ({ ...f, isPaket: v }))}
+                  className={`flex-1 h-10 rounded-xl border text-sm transition-colors ${
+                    form.isPaket === v
+                      ? 'border-[#4c0c13] bg-[#4c0c13]/5 text-[#4c0c13] font-semibold'
+                      : 'border-[#eadfd0] text-[#8a7768]'
+                  }`}>
+                  {v ? 'Paket pilih varian' : 'Produk biasa'}
+                </button>
+              ))}
+            </div>
+            {form.isPaket && (
+              <VariantEditor
+                maxVariants={form.maxVariants}
+                variants={form.variants}
+                onMaxChange={maxVariants => setForm(f => ({ ...f, maxVariants }))}
+                onChange={variants => setForm(f => ({ ...f, variants }))}
+              />
+            )}
           </div>
           <div className="flex flex-col gap-2">
             <label className="text-[#2b1d16] text-sm">Status aktif</label>
@@ -120,7 +158,7 @@ function ProductModal({ mode, product, cats, onClose, onSave }) {
         {/* Footer */}
         <div className="flex gap-3 px-6 py-5 border-t border-[#eadfd0]">
           <button onClick={onClose} className="btn-secondary flex-1 justify-center">Batal</button>
-          <button disabled={saving || !form.name?.trim() || form.price === ''} onClick={() => submit(form)} className="btn-primary flex-1 justify-center disabled:opacity-60">
+          <button disabled={saving || !form.name?.trim() || form.price === '' || !!paketProblem} onClick={() => submit(form)} className="btn-primary flex-1 justify-center disabled:opacity-60">
             {mode === 'add' ? 'Tambah Produk' : 'Simpan Perubahan'}
           </button>
         </div>
@@ -227,15 +265,21 @@ export default function KelolaProduk() {
 
   // Melempar galat agar modal tetap terbuka dan menampilkan pesannya.
   async function handleSave(form) {
+    // produk biasa: isi paket 0 & tanpa varian (varian lama dihapus/dinonaktifkan server)
+    const paket = {
+      maks_varian: form.isPaket ? Number(form.maxVariants) : 0,
+      variants: form.isPaket ? form.variants.map(toVariantPayload) : [],
+    };
     if (form.deleted) {
       await api.deleteProduct(form.id);
     } else if (modal === 'add') {
-      await api.insertProduct({ nama: form.name.trim(), harga: Number(form.price), kategori: form.kategori, jenis: JENIS_VALUE[form.jenis] });
+      await api.insertProduct({ nama: form.name.trim(), harga: Number(form.price), kategori: form.kategori, jenis: JENIS_VALUE[form.jenis], ...paket });
     } else {
       const jenisBerubah = form.jenis !== selectedProduct.jenis; // ganti jenis = bobot ikut bawaan jenis baru
       await api.updateProduct(form.id, {
         nama: form.name.trim(), harga: Number(form.price), aktif: form.active, kategori: form.kategori,
         jenis: jenisBerubah ? JENIS_VALUE[form.jenis] : undefined,
+        ...paket,
       });
     }
     prods.reload();
@@ -354,7 +398,14 @@ export default function KelolaProduk() {
 
         {filtered.map((p) => (
           <div key={p.id} className="flex items-center px-6 h-16 gap-4 border-b border-[#eadfd0] last:border-0 hover:bg-[#faf6ee]/50 transition-colors">
-            <p className="flex-1 min-w-0 text-sm font-semibold text-[#2b1d16] truncate">{p.name}</p>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-[#2b1d16] truncate">{p.name}</p>
+              {p.maxVariants > 0 && (
+                <p className="text-xs text-[#7e4722] truncate" title={p.variants.filter(v => v.active).map(v => v.name).join(', ')}>
+                  Isi {p.maxVariants} varian · {p.variants.filter(v => v.active).length} varian aktif
+                </p>
+              )}
+            </div>
             <p className="w-[120px] text-sm text-[#2b1d16]">Rp {p.price.toLocaleString('id-ID')}</p>
             <p className="w-[180px] text-sm text-[#78685c]">{p.jenis}</p>
             <div className="w-[120px]">

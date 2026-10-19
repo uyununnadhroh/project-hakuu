@@ -41,6 +41,9 @@ type ReqProduct struct {
 	Kategori string   `json:"kategori"`
 	Jenis    string   `json:"jenis"`
 	Bobot    *float64 `json:"bobot"`
+	// Paket pilih varian: isi paket (0 = produk biasa) dan daftar variannya.
+	MaksVarian int            `json:"maks_varian"`
+	Variants   []VariantInput `json:"variants"`
 }
 
 type ReqPatchProduct struct {
@@ -50,6 +53,19 @@ type ReqPatchProduct struct {
 	Kategori *string  `json:"kategori"`
 	Jenis    *string  `json:"jenis"`
 	Bobot    *float64 `json:"bobot"`
+	// Variants bila diisi menggantikan seluruh daftar varian produk:
+	// varian lama yang tidak dikirim dihapus (atau dinonaktifkan bila sudah pernah dipesan).
+	MaksVarian *int            `json:"maks_varian"`
+	Variants   *[]VariantInput `json:"variants"`
+}
+
+// VariantInput satu varian paket. ID kosong = varian baru.
+type VariantInput struct {
+	ID          int64    `json:"id,omitempty"`
+	Nama        string   `json:"nama"`
+	OpsiLabel   string   `json:"opsi_label"`
+	OpsiPilihan []string `json:"opsi_pilihan"`
+	Aktif       *bool    `json:"aktif"` // kosong = aktif
 }
 
 type ReqCategory struct {
@@ -246,14 +262,17 @@ type ProductVariant struct {
 	Nama        string   `json:"nama"`
 	OpsiLabel   string   `json:"opsi_label,omitempty"`   // mis. "Isian selai"
 	OpsiPilihan []string `json:"opsi_pilihan,omitempty"` // mis. ["Stroberi","Blueberry"]
+	Aktif       bool     `json:"aktif"`
 }
 
 type ProductInput struct {
-	Nama     string
-	Harga    float64
-	Kategori string
-	Jenis    string
-	Bobot    *float64
+	Nama       string
+	Harga      float64
+	Kategori   string
+	Jenis      string
+	Bobot      *float64
+	MaksVarian int
+	Variants   []VariantInput
 }
 
 type Customer struct {

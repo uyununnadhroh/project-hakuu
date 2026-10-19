@@ -40,7 +40,8 @@ func (h *Handler) AddProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id, err := h.service.AddProduct(ctx, bakery.ProductInput{
-		Nama: req.Nama, Harga: req.Harga, Kategori: req.Kategori, Jenis: req.Jenis, Bobot: req.Bobot})
+		Nama: req.Nama, Harga: req.Harga, Kategori: req.Kategori, Jenis: req.Jenis, Bobot: req.Bobot,
+		MaksVarian: req.MaksVarian, Variants: req.Variants})
 	if err != nil {
 		setError(&resp, r, err)
 		return

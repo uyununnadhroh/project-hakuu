@@ -6,19 +6,40 @@ const (
 	listProducts  = "ListProducts"
 	qListProducts = `SELECT id, nama, harga, aktif, kategori, jenis, bobot, maks_varian FROM products ORDER BY id`
 
+	// semua varian (termasuk nonaktif, untuk Kelola Produk); Input Pesanan hanya memakai yang aktif
 	listProductVariants  = "ListProductVariants"
-	qListProductVariants = `SELECT id, product_id, nama, COALESCE(opsi_label,''), opsi_pilihan
-				FROM product_variants WHERE aktif = TRUE ORDER BY product_id, urutan, id`
+	qListProductVariants = `SELECT id, product_id, nama, COALESCE(opsi_label,''), opsi_pilihan, aktif
+				FROM product_variants ORDER BY product_id, urutan, id`
 
 	getVariantsByProduct  = "GetVariantsByProduct"
-	qGetVariantsByProduct = `SELECT id, product_id, nama, COALESCE(opsi_label,''), opsi_pilihan
+	qGetVariantsByProduct = `SELECT id, product_id, nama, COALESCE(opsi_label,''), opsi_pilihan, aktif
 				FROM product_variants WHERE product_id = ? AND aktif = TRUE ORDER BY urutan, id`
+
+	getAllVariantsLock  = "GetAllVariantsLock"
+	qGetAllVariantsLock = `SELECT id, product_id, nama, COALESCE(opsi_label,''), opsi_pilihan, aktif
+				FROM product_variants WHERE product_id = ? ORDER BY urutan, id FOR UPDATE`
+
+	countVariantUsage  = "CountVariantUsage"
+	qCountVariantUsage = `SELECT COUNT(*) FROM order_item_variants WHERE variant_id = ?`
+
+	insProductVariant  = "InsProductVariant"
+	qInsProductVariant = `INSERT INTO product_variants (product_id, nama, opsi_label, opsi_pilihan, aktif, urutan) VALUES (?,?,?,?,?,?)`
+
+	updProductVariant  = "UpdProductVariant"
+	qUpdProductVariant = `UPDATE product_variants SET nama = ?, opsi_label = ?, opsi_pilihan = ?, aktif = ?, urutan = ?
+				WHERE id = ? AND product_id = ?`
+
+	delProductVariant  = "DelProductVariant"
+	qDelProductVariant = `DELETE FROM product_variants WHERE id = ?`
+
+	updProductMaksVarian  = "UpdProductMaksVarian"
+	qUpdProductMaksVarian = `UPDATE products SET maks_varian = ? WHERE id = ?`
 
 	countProductByID  = "CountProductByID"
 	qCountProductByID = `SELECT COUNT(*) FROM products WHERE id = ?`
 
 	insProduct  = "InsProduct"
-	qInsProduct = `INSERT INTO products (nama, harga, kategori, jenis, bobot) VALUES (?,?,?,?,?)`
+	qInsProduct = `INSERT INTO products (nama, harga, kategori, jenis, bobot, maks_varian) VALUES (?,?,?,?,?,?)`
 
 	updProductNama  = "UpdProductNama"
 	qUpdProductNama = `UPDATE products SET nama = ? WHERE id = ?`

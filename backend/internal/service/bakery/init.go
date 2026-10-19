@@ -86,7 +86,13 @@ type BakeryData interface {
 	ListProducts(ctx context.Context) ([]bakery.Product, error)
 	ListProductVariants(ctx context.Context) ([]bakery.ProductVariant, error)
 	CountProductByID(ctx context.Context, id int64) (int, error)
-	InsertProduct(ctx context.Context, nama string, harga float64, kategori, jenis string, bobot float64) (int64, error)
+	InsertProduct(ctx context.Context, tx *sqlx.Tx, nama string, harga float64, kategori, jenis string, bobot float64, maksVarian int) (int64, error)
+	GetAllVariantsLock(ctx context.Context, tx *sqlx.Tx, productID int64) ([]bakery.ProductVariant, error)
+	CountVariantUsage(ctx context.Context, tx *sqlx.Tx, variantID int64) (int, error)
+	InsertProductVariant(ctx context.Context, tx *sqlx.Tx, productID int64, v bakery.ProductVariant, urutan int) error
+	UpdateProductVariant(ctx context.Context, tx *sqlx.Tx, productID int64, v bakery.ProductVariant, urutan int) error
+	DeleteProductVariant(ctx context.Context, tx *sqlx.Tx, id int64) error
+	UpdateProductMaksVarian(ctx context.Context, tx *sqlx.Tx, id int64, maks int) error
 	UpdateProductNama(ctx context.Context, id int64, nama string) error
 	UpdateProductHarga(ctx context.Context, id int64, harga float64) error
 	UpdateProductAktif(ctx context.Context, id int64, aktif bool) error

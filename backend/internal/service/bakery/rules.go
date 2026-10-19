@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"bakery-scheduler/internal/entity/bakery"
@@ -236,4 +237,74 @@ func CheckVariants(maks int, avail []bakery.ProductVariant, chosen []bakery.Item
 		}
 	}
 	return nil
+}
+
+// Batas paket pilih varian.
+const (
+	MaxIsiPaket   = 10 // isi paket paling banyak
+	MaxOpsiVarian = 20 // pilihan tambahan per varian paling banyak
+)
+
+// NormVariants memeriksa dan merapikan daftar varian sebuah produk.
+//   - maks 0 = produk biasa: tidak boleh punya varian
+//   - nama varian wajib, maksimal 60 karakter, tidak boleh dobel (tanpa beda huruf besar/kecil)
+//   - pilihan tambahan (mis. isian selai) tidak boleh kosong/dobel; labelnya bawaan "Pilihan"
+//   - varian aktif minimal sebanyak isi paket, supaya pesanan selalu bisa dipenuhi
+func NormVariants(maks int, in []bakery.VariantInput) ([]bakery.ProductVariant, error) {
+	if maks < 0 || maks > MaxIsiPaket {
+		return nil, fmt.Errorf("%w: isi paket harus 0 sampai %d varian", bakery.ErrValidation, MaxIsiPaket)
+	}
+	if maks == 0 && len(in) > 0 {
+		return nil, fmt.Errorf("%w: varian hanya untuk paket pilih varian (isi paket lebih dari 0)", bakery.ErrValidation)
+	}
+	out := make([]bakery.ProductVariant, 0, len(in))
+	seen := map[string]bool{}
+	aktif := 0
+	for _, v := range in {
+		nama := strings.TrimSpace(v.Nama)
+		if nama == "" || len([]rune(nama)) > 60 {
+			return nil, fmt.Errorf("%w: nama varian wajib diisi (maksimal 60 karakter)", bakery.ErrValidation)
+		}
+		key := strings.ToLower(nama)
+		if seen[key] {
+			return nil, fmt.Errorf("%w: varian %s ditulis lebih dari sekali", bakery.ErrValidation, nama)
+		}
+		seen[key] = true
+
+		var opsi []string
+		seenOpsi := map[string]bool{}
+		for _, o := range v.OpsiPilihan {
+			o = strings.TrimSpace(o)
+			if o == "" || len([]rune(o)) > 60 {
+				return nil, fmt.Errorf("%w: pilihan untuk varian %s tidak boleh kosong (maksimal 60 karakter)", bakery.ErrValidation, nama)
+			}
+			if seenOpsi[strings.ToLower(o)] {
+				return nil, fmt.Errorf("%w: pilihan %s pada varian %s ditulis lebih dari sekali", bakery.ErrValidation, o, nama)
+			}
+			seenOpsi[strings.ToLower(o)] = true
+			opsi = append(opsi, o)
+		}
+		if len(opsi) > MaxOpsiVarian {
+			return nil, fmt.Errorf("%w: varian %s maksimal %d pilihan", bakery.ErrValidation, nama, MaxOpsiVarian)
+		}
+		label := ""
+		if len(opsi) > 0 {
+			label = strings.TrimSpace(v.OpsiLabel)
+			if label == "" {
+				label = "Pilihan"
+			}
+			if len([]rune(label)) > 60 {
+				return nil, fmt.Errorf("%w: label pilihan varian %s maksimal 60 karakter", bakery.ErrValidation, nama)
+			}
+		}
+		on := v.Aktif == nil || *v.Aktif
+		if on {
+			aktif++
+		}
+		out = append(out, bakery.ProductVariant{ID: v.ID, Nama: nama, OpsiLabel: label, OpsiPilihan: opsi, Aktif: on})
+	}
+	if aktif < maks {
+		return nil, fmt.Errorf("%w: paket isi %d butuh minimal %d varian aktif (baru %d)", bakery.ErrValidation, maks, maks, aktif)
+	}
+	return out, nil
 }

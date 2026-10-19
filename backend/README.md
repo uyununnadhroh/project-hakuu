@@ -119,6 +119,12 @@ Parameter `batas_pagi_jam` tidak dipakai lagi. Order lama yang sudah terjadwal d
 
 Contoh order: `{"items":[{"product_id":1,"qty":30}],"deliver_at":"2026-10-20 15:00","customer":{"nama":"Bu Sari","telepon":"0812","alamat":"Jl. Mawar"}}`
 
+Paket pilih varian lewat `POST /api/products` / `PATCH /api/products/{id}`: kirim `maks_varian` (isi paket, 0 = produk biasa)
+dan `variants` (daftar lengkap, menggantikan yang lama). Contoh:
+`{"maks_varian":3,"variants":[{"id":2,"nama":"Coklat"},{"nama":"Lava","opsi_label":"Isian selai","opsi_pilihan":["Stroberi","Nanas"]},{"nama":"Keju","aktif":false}]}`.
+Varian aktif minimal sebanyak `maks_varian`. Varian lama yang tidak dikirim dihapus, atau dinonaktifkan bila sudah pernah dipesan.
+`GET /api/products` mengirim semua varian beserta `aktif`; Input Pesanan hanya menampilkan yang aktif.
+
 ## Menambah fitur baru (pola yang sama)
 1. Struct request/response → `internal/entity/bakery/bakery.go`
 2. Query → konstanta di `internal/data/bakery/init_xxx.go`, daftarkan di `init.go` (readStmt/insertStmt/...),

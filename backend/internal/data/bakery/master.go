@@ -55,7 +55,7 @@ func scanVariants(rows *sqlx.Rows) ([]bakery.ProductVariant, error) {
 	for rows.Next() {
 		var v bakery.ProductVariant
 		var opsi []byte
-		if err := rows.Scan(&v.ID, &v.ProductID, &v.Nama, &v.OpsiLabel, &opsi); err != nil {
+		if err := rows.Scan(&v.ID, &v.ProductID, &v.Nama, &v.OpsiLabel, &opsi, &v.Aktif); err != nil {
 			return nil, err
 		}
 		if len(opsi) > 0 {
@@ -68,14 +68,66 @@ func scanVariants(rows *sqlx.Rows) ([]bakery.ProductVariant, error) {
 	return out, rows.Err()
 }
 
+// GetAllVariantsLock semua varian satu produk (termasuk nonaktif), dikunci untuk diubah.
+func (d Data) GetAllVariantsLock(ctx context.Context, tx *sqlx.Tx, productID int64) ([]bakery.ProductVariant, error) {
+	rows, err := d.st(ctx, tx, getAllVariantsLock).QueryxContext(ctx, productID)
+	if err != nil {
+		return nil, err
+	}
+	return scanVariants(rows)
+}
+
+func (d Data) CountVariantUsage(ctx context.Context, tx *sqlx.Tx, variantID int64) (int, error) {
+	var n int
+	err := d.st(ctx, tx, countVariantUsage).QueryRowxContext(ctx, variantID).Scan(&n)
+	return n, err
+}
+
+// opsiJSON: pilihan opsi disimpan sebagai JSON array, kosong = NULL.
+func opsiJSON(opsi []string) (interface{}, error) {
+	if len(opsi) == 0 {
+		return nil, nil
+	}
+	b, err := json.Marshal(opsi)
+	return string(b), err
+}
+
+func (d Data) InsertProductVariant(ctx context.Context, tx *sqlx.Tx, productID int64, v bakery.ProductVariant, urutan int) error {
+	opsi, err := opsiJSON(v.OpsiPilihan)
+	if err != nil {
+		return err
+	}
+	_, err = d.st(ctx, tx, insProductVariant).ExecContext(ctx, productID, v.Nama, nullStr(v.OpsiLabel), opsi, v.Aktif, urutan)
+	return err
+}
+
+func (d Data) UpdateProductVariant(ctx context.Context, tx *sqlx.Tx, productID int64, v bakery.ProductVariant, urutan int) error {
+	opsi, err := opsiJSON(v.OpsiPilihan)
+	if err != nil {
+		return err
+	}
+	_, err = d.st(ctx, tx, updProductVariant).ExecContext(ctx, v.Nama, nullStr(v.OpsiLabel), opsi, v.Aktif, urutan, v.ID, productID)
+	return err
+}
+
+func (d Data) DeleteProductVariant(ctx context.Context, tx *sqlx.Tx, id int64) error {
+	_, err := d.st(ctx, tx, delProductVariant).ExecContext(ctx, id)
+	return err
+}
+
+func (d Data) UpdateProductMaksVarian(ctx context.Context, tx *sqlx.Tx, id int64, maks int) error {
+	_, err := d.st(ctx, tx, updProductMaksVarian).ExecContext(ctx, maks, id)
+	return err
+}
+
 func (d Data) CountProductByID(ctx context.Context, id int64) (int, error) {
 	var n int
 	err := (*d.stmt)[countProductByID].QueryRowxContext(ctx, id).Scan(&n)
 	return n, err
 }
 
-func (d Data) InsertProduct(ctx context.Context, nama string, harga float64, kategori, jenis string, bobot float64) (int64, error) {
-	r, err := (*d.stmt)[insProduct].ExecContext(ctx, nama, harga, kategori, jenis, bobot)
+func (d Data) InsertProduct(ctx context.Context, tx *sqlx.Tx, nama string, harga float64, kategori, jenis string, bobot float64, maksVarian int) (int64, error) {
+	r, err := d.st(ctx, tx, insProduct).ExecContext(ctx, nama, harga, kategori, jenis, bobot, maksVarian)
 	if err != nil {
 		return 0, err
 	}

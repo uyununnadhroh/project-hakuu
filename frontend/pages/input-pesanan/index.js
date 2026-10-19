@@ -180,7 +180,8 @@ export default function InputPesanan() {
   const [preview, setPreview]         = useState(null);
   const [qtyDraft, setQtyDraft]       = useState({});     // teks qty yang sedang diketik (boleh kosong)
 
-  const prods    = useLoad(() => api.getProducts().then(l => l.filter(p => p.aktif).map(toUiProduct)), []);
+  const prods    = useLoad(() => api.getProducts().then(l => l.filter(p => p.aktif).map(toUiProduct)
+    .map(p => ({ ...p, variants: p.variants.filter(v => v.active) }))), []);
   const cats     = useLoad(() => api.getCategories(), []);
   const settings = useLoad(() => api.getSettings(), []);
 

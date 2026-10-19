@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"bakery-scheduler/internal/entity/bakery"
+
+	"github.com/jmoiron/sqlx"
 )
 
 // Bobot kapasitas bawaan per jenis produksi. Produk bertopping butuh waktu
@@ -66,7 +68,8 @@ func (s Service) ListProducts(ctx context.Context) ([]bakery.Product, error) {
 	return list, nil
 }
 
-// AddProduct menambah produk lengkap dengan kategori, jenis, dan bobot.
+// AddProduct menambah produk lengkap dengan kategori, jenis, bobot, dan (untuk
+// paket pilih varian) isi paket beserta variannya.
 func (s Service) AddProduct(ctx context.Context, in bakery.ProductInput) (int64, error) {
 	in.Nama = strings.TrimSpace(in.Nama)
 	if in.Nama == "" || in.Harga < 0 {
@@ -93,12 +96,30 @@ func (s Service) AddProduct(ctx context.Context, in bakery.ProductInput) (int64,
 	if err := checkBobot(bobot); err != nil {
 		return 0, err
 	}
-	return s.bakery.InsertProduct(ctx, in.Nama, in.Harga, in.Kategori, jenis, bobot)
+	variants, err := NormVariants(in.MaksVarian, in.Variants)
+	if err != nil {
+		return 0, err
+	}
+
+	tx, err := s.bakery.BeginTx(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	id, err := s.bakery.InsertProduct(ctx, tx, in.Nama, in.Harga, in.Kategori, jenis, bobot, in.MaksVarian)
+	if err != nil {
+		return 0, err
+	}
+	if err := s.saveVariants(ctx, tx, id, in.MaksVarian, variants); err != nil {
+		return 0, err
+	}
+	return id, tx.Commit()
 }
 
 // PatchProduct mengubah sebagian kolom produk (PATCH /api/products/{id}).
 func (s Service) PatchProduct(ctx context.Context, id int64, in bakery.ReqPatchProduct) error {
-	if in.Nama == nil && in.Harga == nil && in.Aktif == nil && in.Kategori == nil && in.Jenis == nil && in.Bobot == nil {
+	if in.Nama == nil && in.Harga == nil && in.Aktif == nil && in.Kategori == nil && in.Jenis == nil && in.Bobot == nil &&
+		in.MaksVarian == nil && in.Variants == nil {
 		return fmt.Errorf("%w: tidak ada yang diubah", bakery.ErrValidation)
 	}
 	if in.Nama != nil || in.Harga != nil || in.Aktif != nil {
@@ -106,7 +127,121 @@ func (s Service) PatchProduct(ctx context.Context, id int64, in bakery.ReqPatchP
 			return err
 		}
 	}
-	return s.UpdateProductDetail(ctx, id, in.Kategori, in.Jenis, in.Bobot)
+	if err := s.UpdateProductDetail(ctx, id, in.Kategori, in.Jenis, in.Bobot); err != nil {
+		return err
+	}
+	if in.MaksVarian != nil || in.Variants != nil {
+		return s.UpdateProductVariants(ctx, id, in.MaksVarian, in.Variants)
+	}
+	return nil
+}
+
+// UpdateProductVariants mengubah isi paket dan/atau daftar varian. maks atau
+// list yang nil berarti memakai nilai yang sudah tersimpan.
+func (s Service) UpdateProductVariants(ctx context.Context, id int64, maks *int, list *[]bakery.VariantInput) error {
+	tx, err := s.bakery.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	p, err := s.bakery.GetProductPrice(ctx, tx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return bakery.ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	m := p.MaksVarian
+	if maks != nil {
+		m = *maks
+	}
+	var in []bakery.VariantInput
+	if list != nil {
+		in = *list
+	} else {
+		cur, err := s.bakery.GetAllVariantsLock(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		for _, v := range cur {
+			aktif := v.Aktif
+			in = append(in, bakery.VariantInput{ID: v.ID, Nama: v.Nama, OpsiLabel: v.OpsiLabel, OpsiPilihan: v.OpsiPilihan, Aktif: &aktif})
+		}
+	}
+	variants, err := NormVariants(m, in)
+	if err != nil {
+		return err
+	}
+	if err := s.saveVariants(ctx, tx, id, m, variants); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// saveVariants menyamakan varian tersimpan dengan daftar baru (urutan = urutan daftar).
+// Varian lama yang tidak ada di daftar dihapus; bila sudah pernah dipesan cukup
+// dinonaktifkan supaya riwayat pesanan tetap utuh. Varian baru yang namanya sama
+// dengan varian lama dipakai ulang (diaktifkan lagi) agar tidak bentrok nama.
+func (s Service) saveVariants(ctx context.Context, tx *sqlx.Tx, productID int64, maks int, list []bakery.ProductVariant) error {
+	cur, err := s.bakery.GetAllVariantsLock(ctx, tx, productID)
+	if err != nil {
+		return err
+	}
+	byID := map[int64]bakery.ProductVariant{}
+	for _, v := range cur {
+		byID[v.ID] = v
+	}
+	claimed := map[int64]bool{}
+	for _, v := range list {
+		if v.ID == 0 {
+			continue
+		}
+		if _, ok := byID[v.ID]; !ok {
+			return fmt.Errorf("%w: varian %d bukan milik produk ini", bakery.ErrValidation, v.ID)
+		}
+		claimed[v.ID] = true
+	}
+	for i := range list {
+		if list[i].ID != 0 {
+			continue
+		}
+		for _, old := range cur {
+			if !claimed[old.ID] && strings.EqualFold(old.Nama, list[i].Nama) {
+				list[i].ID = old.ID
+				claimed[old.ID] = true
+				break
+			}
+		}
+	}
+	for _, old := range cur {
+		if claimed[old.ID] {
+			continue
+		}
+		used, err := s.bakery.CountVariantUsage(ctx, tx, old.ID)
+		if err != nil {
+			return err
+		}
+		if used == 0 {
+			err = s.bakery.DeleteProductVariant(ctx, tx, old.ID)
+		} else if old.Aktif {
+			old.Aktif = false
+			err = s.bakery.UpdateProductVariant(ctx, tx, productID, old, 999)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	for i, v := range list {
+		if v.ID != 0 {
+			err = s.bakery.UpdateProductVariant(ctx, tx, productID, v, i+1)
+		} else {
+			err = s.bakery.InsertProductVariant(ctx, tx, productID, v, i+1)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return s.bakery.UpdateProductMaksVarian(ctx, tx, productID, maks)
 }
 
 // UpdateProduct: ubah nama, harga, atau status aktif. Harga baru tidak

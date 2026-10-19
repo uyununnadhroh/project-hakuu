@@ -57,6 +57,7 @@ export function toUiProduct(p) {
             name: v.nama,
             optionLabel: v.opsi_label || "",
             options: v.opsi_pilihan || [],
+            active: v.aktif !== false,
         })),
     };
 }
