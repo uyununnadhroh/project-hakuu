@@ -5,7 +5,7 @@ import api from '../../services/bakery';
 import { toUiOrder } from '../../utils/mapper';
 import { useLoad } from '../../utils/useLoad';
 import ErrorBanner from '../../components/ErrorBanner';
-import { badgeMap, fmtTgl, isoDate, ymd } from '../../utils/orderStatus';
+import { badgeMap, fmtTgl, isoDate, statusText, ymd } from '../../utils/orderStatus';
 
 // Warna bar mengikuti legenda: <70% hijau, 70–90% kuning, >90% merah.
 const barColorFor = (pct) => (pct > 90 ? '#b74b40' : pct >= 70 ? '#a66a17' : '#327a52');
@@ -180,7 +180,7 @@ export default function Dashboard() {
                     <p className="text-sm text-[#2b1d16]">{fmtTgl(o.tanggalKirim)} · {o.jamKirim}</p>
                     <p className="text-xs text-[#8a7768]">{o.tanggalProduksi ? fmtTgl(o.tanggalProduksi) : 'Menunggu negosiasi'}</p>
                   </td>
-                  <td className="px-6 py-4"><span className={badgeMap[o.statusOtomatis] ?? badgeMap['Diterima']}>{o.statusOtomatis}</span></td>
+                  <td className="px-6 py-4"><span className={badgeMap[o.statusOtomatis] ?? badgeMap['Diterima']}>{statusText(o)}</span></td>
                   <td className="px-6 py-4">
                     <button onClick={() => router.push('/daftar-pesanan')} className="text-[#8a7768] hover:text-[#2b1d16]">
                       <img src={iconEllipsis} alt="Buka daftar pesanan" className="size-4" />

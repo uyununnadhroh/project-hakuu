@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import api from '../../services/bakery';
 import { useLoad } from '../../utils/useLoad';
 import { toUiOrder, penanggungJawab } from '../../utils/mapper';
-import { badgeMap, fmtTgl, ymd } from '../../utils/orderStatus';
+import { badgeMap, fmtTgl, statusText, ymd } from '../../utils/orderStatus';
 import ErrorBanner from '../../components/ErrorBanner';
 
 /*
@@ -444,7 +444,7 @@ export default function LaporanPenjualan() {
                       <td className="px-3 py-3 text-right whitespace-nowrap">{num(o.qty)}</td>
                       <td className={`px-3 py-3 text-right whitespace-nowrap font-semibold ${dibatalkan ? 'line-through' : 'text-[#4c0c13]'}`}>{rp(o.totalHarga)}</td>
                       <td className="px-6 py-3 whitespace-nowrap">
-                        <span className={badgeMap[o.statusOtomatis] ?? badgeMap['Diterima']}>{o.statusOtomatis}</span>
+                        <span className={badgeMap[o.statusOtomatis] ?? badgeMap['Diterima']}>{statusText(o)}</span>
                       </td>
                     </tr>
                   );

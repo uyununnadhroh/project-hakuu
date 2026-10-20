@@ -5,7 +5,7 @@ import api from '../../services/bakery';
 import { toUiOrder, penanggungJawab } from '../../utils/mapper';
 import { useLoad } from '../../utils/useLoad';
 import ErrorBanner from '../../components/ErrorBanner';
-import { badgeMap, fmtTgl, hLabel, ymd } from '../../utils/orderStatus';
+import { badgeMap, fmtTgl, hLabel, statusText, ymd } from '../../utils/orderStatus';
 
 const STATUS_TABS = ['Semua', 'Diterima', 'Dijadwalkan', 'Diproduksi', 'Selesai', 'Dibatalkan'];
 const rp = (n) => `Rp ${Number(n).toLocaleString('id-ID')}`;
@@ -126,7 +126,7 @@ function DetailModal({ order, onClose, onChanged }) {
         <div className="flex items-center justify-between px-6 py-5 border-b border-[#eadfd0]">
           <div>
             <h2 className="text-[#2b1d16] text-lg font-semibold">Detail pesanan {order.id}</h2>
-            <span className={`${badgeMap[order.statusOtomatis]} mt-1.5`}>{order.statusOtomatis}</span>
+            <span className={`${badgeMap[order.statusOtomatis]} mt-1.5`}>{statusText(order)}</span>
           </div>
           <button onClick={onClose} className="text-[#8a7768] hover:text-[#2b1d16] text-xl leading-none">×</button>
         </div>
@@ -408,7 +408,7 @@ export default function DaftarPesanan() {
                 <p className="text-xs text-[#8a7768]">{o.tanggalProduksi ? `${fmtTgl(o.tanggalProduksi)} · ${hLabel(o.tanggalKirim, o.tanggalProduksi)}` : 'Menunggu negosiasi'}</p>
               </div>
               <div className="w-[120px]">
-                <span className={badgeMap[o.statusOtomatis] ?? badgeMap['Diterima']}>{o.statusOtomatis}</span>
+                <span className={badgeMap[o.statusOtomatis] ?? badgeMap['Diterima']}>{statusText(o)}</span>
               </div>
               <div className="w-[36px] relative">
                 <button onClick={() => setMenuOpen(menuOpen === o.id ? null : o.id)} className="text-[#8a7768] hover:text-[#2b1d16]">

@@ -58,7 +58,13 @@ export function uiStatus(o) {
   }
 }
 
-const base = 'inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium';
+/** Teks badge status: Dijadwalkan diberi tanggal produksinya, mis. "Dijadwalkan tgl 20 Okt". */
+export function statusText(o) {
+  if (o.statusOtomatis === 'Dijadwalkan' && o.tanggalProduksi) return `Dijadwalkan tgl ${fmtTgl(o.tanggalProduksi)}`;
+  return o.statusOtomatis;
+}
+
+const base = 'inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap';
 export const badgeMap = {
   'Dijadwalkan': `${base} border border-[#4c0c13] text-[#4c0c13] bg-white`,
   'Diterima':    `${base} bg-[#fcebc8] text-[#7e4722]`,
