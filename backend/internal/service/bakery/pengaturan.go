@@ -28,9 +28,8 @@ var settingRules = map[string]settingRule{
 	"ambang_selisih_skor":            {0, 1, false},
 	"maks_tawaran_jam":               {1, 10, true},
 	"batas_respons_menit":            {1, 1440, true},
+	"jam_produksi_mulai":             {0, 23, true},
 	"jam_produksi_selesai":           {0, 23, true},
-	"menit_packing":                  {0, 600, true},
-	"menit_tempuh":                   {0, 600, true},
 	"jam_kirim_terakhir":             {0, 23, true},
 	"jam_peringatan_sebelum_selesai": {0, 12, true},
 }

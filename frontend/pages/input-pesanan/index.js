@@ -93,8 +93,8 @@ function CapacitySidebar({ items, preview, onPilihJam }) {
           </div>
         )}
         {preview?.lewatBatas && (
-          <div className="bg-[#fdf6ec] border border-[#e8c98a] rounded-xl p-3 text-xs text-[#7e4722]">
-            ⚠ Jam kirim melewati batas pengiriman {preview.batasLabel}.
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-[#b74b40]">
+            ✕ Jam kirim melewati batas pengiriman {preview.batasLabel}. Pesanan tidak bisa disimpan.
           </div>
         )}
 
@@ -193,19 +193,21 @@ export default function InputPesanan() {
   const regularProducts = allProducts.filter(p => !p.maxVariants);
   const variantsIncomplete = orderItems.some(i => !variantsComplete(i));
 
-  const jamValid = /^([01]\d|2[0-3]):[0-5]\d$/.test(jamKirim);
-  // Langkah di indikator hanya bisa diklik bila tombol "Lanjut" menuju langkah itu aktif.
-  const bisaLangkah2 = !!pembeli && !!tanggalKirim && jamValid;
-  const bisaLangkah3 = bisaLangkah2 && orderItems.length > 0 && !variantsIncomplete;
-  const bisaKeLangkah = { 1: true, 2: bisaLangkah2, 3: bisaLangkah3 };
-  // Jam siap = produksi selesai + packing + perjalanan (default 10.00 + 30 + 30 menit = 11.00).
+  // Batas H-1 (jam siap, default 11.00): jam kirim sebelum ini wajib diproduksi H-1.
   // Hari H hanya boleh dipakai bila jam kirim >= jam siap.
   const prm = settings.data?.parameters || {};
-  const prodEndHour = Number(prm.jam_produksi_selesai ?? 10);
-  const readyMin = prodEndHour * 60 + Number(prm.menit_packing ?? 30) + Number(prm.menit_tempuh ?? 30);
+  const prodEndHour = Number(prm.jam_produksi_selesai ?? 18);  // produksi 06.00–18.00
+  const readyMin = Number(prm.batas_pagi_jam ?? 11) * 60;
   const readyLabel = `${String(Math.floor(readyMin / 60)).padStart(2, '0')}.${String(readyMin % 60).padStart(2, '0')}`;
-  const lastHour = Number(prm.jam_kirim_terakhir ?? 19);       // jam kirim paling akhir (19.00)
+  const lastHour = Number(prm.jam_kirim_terakhir ?? 20);       // jam kirim paling akhir (20.00)
   const batasLabel = `${String(lastHour).padStart(2, '0')}.00`;
+
+  const jamValid = /^([01]\d|2[0-3]):[0-5]\d$/.test(jamKirim);
+  const lewatBatas = jamValid && (Number(jamKirim.slice(0, 2)) * 60 + Number(jamKirim.slice(3, 5))) > lastHour * 60;
+  // Langkah di indikator hanya bisa diklik bila tombol "Lanjut" menuju langkah itu aktif.
+  const bisaLangkah2 = !!pembeli && !!tanggalKirim && jamValid && !lewatBatas;
+  const bisaLangkah3 = bisaLangkah2 && orderItems.length > 0 && !variantsIncomplete;
+  const bisaKeLangkah = { 1: true, 2: bisaLangkah2, 3: bisaLangkah3 };
   const maxRek = Number(prm.maks_tawaran_jam ?? 3);
   const stepJam = Math.max(1, Number(prm.pembulatan_jam ?? 1));
   const load = Math.ceil(orderItems.reduce((s, i) => s + i.qty * i.bobot, 0) - 1e-9);
@@ -237,7 +239,7 @@ export default function InputPesanan() {
 
   /*
      Rekomendasi jam kirim (meniru server): tanggal tetap sama, hanya jam yang lebih lambat,
-     paling awal jam siap (11.00), paling akhir jam kirim terakhir (19.00), dibulatkan per jam.
+     paling awal jam siap (11.00), paling akhir jam kirim terakhir (20.00), dibulatkan per jam.
      Jam valid bila H-1 masih muat, atau (jam >= 11.00 dan hari H masih muat).
   */
   function hitungRekomendasi() {
@@ -266,7 +268,6 @@ export default function InputPesanan() {
 
   // Hari pertama yang masih muat (meniru urutan server); bila tidak ada, tampilkan hari terakhir.
   let sidebarPreview = null;
-  const lewatBatas = jamValid && (Number(jamKirim.slice(0, 2)) * 60 + Number(jamKirim.slice(3, 5))) > lastHour * 60;
   if (preview?.none) sidebarPreview = { none: preview.none, readyLabel };
   else if (preview?.nego) {
     // H-1 sudah lewat: langsung tampilkan rekomendasi jam di hari kirim
@@ -494,7 +495,7 @@ export default function InputPesanan() {
                       <input
                         type="text"
                         className={`input-field font-mono tracking-wider ${
-                          jamKirim && !/^([01]\d|2[0-3]):[0-5]\d$/.test(jamKirim)
+                          (jamKirim && !/^([01]\d|2[0-3]):[0-5]\d$/.test(jamKirim)) || lewatBatas
                             ? 'border-[#dc2626] focus:border-[#dc2626]'
                             : ''
                         }`}
@@ -519,6 +520,11 @@ export default function InputPesanan() {
                       {jamKirim && !/^([01]\d|2[0-3]):[0-5]\d$/.test(jamKirim) && (
                         <p className="text-[#dc2626] text-xs">
                           Format 24 jam: 00:00 – 23:59
+                        </p>
+                      )}
+                      {lewatBatas && (
+                        <p className="text-[#dc2626] text-xs">
+                          Jam kirim paling lambat {batasLabel}
                         </p>
                       )}
                     </div>
@@ -706,7 +712,7 @@ export default function InputPesanan() {
               )}
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setStep(2)} className="btn-secondary">← Kembali</button>
-                <button onClick={handleSimpan} disabled={saving || variantsIncomplete || orderItems.length === 0} className="btn-primary flex-1 justify-center disabled:opacity-60">
+                <button onClick={handleSimpan} disabled={saving || variantsIncomplete || orderItems.length === 0 || lewatBatas} className="btn-primary flex-1 justify-center disabled:opacity-60">
                   {saving ? 'Menyimpan…' : 'Simpan Pesanan'}
                 </button>
               </div>

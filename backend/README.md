@@ -63,7 +63,7 @@ Frontend `hakuu-web` tidak perlu diubah. Database juga tidak berubah.
 
 ## Menjalankan (Windows PowerShell + XAMPP)
 1. Start MySQL di XAMPP. Database `bakery` sudah ada (dari `db/schema.sql`).
-   Database lama: jalankan juga `db/migrations_002_laporan.sql`, `db/migrations_003_frontend.sql`, `db/migrations_004_penanggung_jawab.sql`, `db/migrations_005_jam_kirim.sql`, `db/migrations_006_paket_varian.sql`, dan `db/migrations_007_konfirmasi_pengiriman.sql` (berurutan; 002–004 dan 006 cukup sekali).
+   Database lama: jalankan juga `db/migrations_002_laporan.sql`, `db/migrations_003_frontend.sql`, `db/migrations_004_penanggung_jawab.sql`, `db/migrations_005_jam_kirim.sql`, `db/migrations_006_paket_varian.sql`, `db/migrations_007_konfirmasi_pengiriman.sql`, dan `db/migrations_008_jam_operasional.sql` (berurutan; 002–004 dan 006 cukup sekali).
    Contoh paket pilih varian (Paket Hemat isi 2/3/4): `db/seed_paket_varian.sql` (opsional).
 2. Cek `files/etc/bakery-scheduler/bakery-scheduler.development.yaml`: DSN database dan ganti `jwt.secret`
    dengan string acak minimal 32 karakter.
@@ -81,19 +81,22 @@ biasanya karena migrasi di langkah 1 belum dijalankan.
 
 ## Aturan hari produksi
 
-Tidak ada produksi H-2. Saat order masuk, sistem memeriksa:
+Jam operasional produksi **06.00–18.00** (`jam_produksi_mulai`, `jam_produksi_selesai`), jam kirim
+paling lambat **20.00** (`jam_kirim_terakhir`; lebih dari itu order ditolak). Tidak ada produksi H-2.
+Saat order masuk, sistem memeriksa:
 
-1. **H-1** (sehari sebelum hari kirim). Bila kapasitas cukup, order langsung diterima.
-2. Bila H-1 kurang/penuh, sistem mencoba menggeser order lain yang skor prioritasnya lebih rendah
-   (hanya ke H-1/hari H milik order itu sendiri).
-3. Masih tidak muat → produksi **dialihkan ke hari H (hari kirim)**, dengan syarat jam kirim
-   **≥ jam siap** = `jam_produksi_selesai` + `menit_packing` + `menit_tempuh` (default 10.00 + 30 + 30 = **11.00**).
-   - Jam kirim yang diminta sudah ≥ 11.00 → langsung diterima di hari H.
-   - Jam kirim < 11.00 → hasil `perlu_negosiasi` dengan rekomendasi jam kirim **di tanggal yang sama**,
-     mulai 11.00 sampai paling lambat **19.00** (`jam_kirim_terakhir`), maksimal `maks_tawaran_jam` pilihan.
-4. Tidak ada jam yang muat sampai 19.00 → ditolak. Tidak ada saran pindah tanggal.
+1. Jam kirim **< 11.00** (`batas_pagi_jam`) → wajib diproduksi **H-1**.
+2. Jam kirim **≥ 11.00** → diproduksi **H-1** bila kapasitas masih cukup; bila tidak, produksi
+   **dialihkan ke hari H (hari kirim)** bila kapasitas hari H cukup.
+3. Masih tidak muat → sistem mencoba menggeser order lain yang skor prioritasnya lebih rendah
+   (hanya ke H-1/hari H milik order itu sendiri), lalu lembur (`lembur_maks`).
+4. Masih tidak muat → hasil `perlu_negosiasi` dengan rekomendasi jam kirim **di tanggal yang sama**,
+   mulai 11.00 (produksi hari H) sampai paling lambat 20.00, maksimal `maks_tawaran_jam` pilihan.
+5. Tidak ada jam yang muat sampai 20.00 → ditolak. Tidak ada saran pindah tanggal.
 
-Parameter `batas_pagi_jam` tidak dipakai lagi. Order lama yang sudah terjadwal di H-2 tidak dipindahkan otomatis.
+Produksi hanya bisa dimulai pada hari produksinya, mulai pukul 06.00. Order yang masuk setelah 18.00
+tidak bisa lagi dijadwalkan untuk produksi hari itu. Order lama yang sudah terjadwal di H-2 tidak
+dipindahkan otomatis.
 
 ## Endpoint (semua kecuali login butuh header `Authorization: Bearer <token>`)
 | Method | Path | Fungsi |

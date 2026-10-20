@@ -265,13 +265,13 @@ func TestAtRiskAndLate(t *testing.T) {
 		}
 		return d.Status
 	}
-	*e.now = at(12, 7, 0) // 3 jam sebelum jam produksi selesai: belum perlu peringatan
+	*e.now = at(12, 15, 0) // 3 jam sebelum jam produksi selesai (18.00): belum perlu peringatan
 	if err := e.svc.RunHourly(ctx); err != nil || status() != "terjadwal" {
-		t.Fatalf("jam 07.00 harusnya masih terjadwal: %s %v", status(), err)
+		t.Fatalf("jam 15.00 harusnya masih terjadwal: %s %v", status(), err)
 	}
-	*e.now = at(12, 8, 0) // 2 jam sebelum selesai, belum mulai produksi
+	*e.now = at(12, 16, 0) // 2 jam sebelum selesai, belum mulai produksi
 	if err := e.svc.RunHourly(ctx); err != nil || status() != "at_risk" {
-		t.Fatalf("jam 08.00 harusnya at_risk: %s %v", status(), err)
+		t.Fatalf("jam 16.00 harusnya at_risk: %s %v", status(), err)
 	}
 	if err := e.svc.Transition(ctx, z.OrderID, "start", "penjual"); err != nil { // at_risk masih bisa dimulai
 		t.Fatalf("start dari at_risk: %v", err)

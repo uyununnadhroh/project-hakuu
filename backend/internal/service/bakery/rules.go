@@ -15,10 +15,10 @@ import (
 func DefaultSettings() bakery.Settings {
 	return bakery.Settings{
 		CapacityPerDay: 800, OvertimeMax: 80, WindowHours: 72,
-		MorningCutoffHour: 12, MaxWaitHours: 96, RoundHours: 1,
+		MorningCutoffHour: 11, MaxWaitHours: 96, RoundHours: 1,
 		MinScoreGap: 0.05, MaxOffers: 3, HoldMinutes: 60,
-		ProductionEndHour: 10, PackingMinutes: 30, TravelMinutes: 30,
-		LastDeliveryHour: 19, WarnHours: 2,
+		ProductionStartHour: 6, ProductionEndHour: 18,
+		LastDeliveryHour: 20, WarnHours: 2,
 		Weights: bakery.Weights{J: 0.648, Q: 0.230, W: 0.122},
 	}
 }
@@ -30,11 +30,10 @@ func DayOf(t time.Time) time.Time {
 
 func AddDays(day time.Time, n int) time.Time { return day.AddDate(0, 0, n) }
 
-// ReadyOffset jam paling awal pesanan bisa dikirim bila diproduksi di hari kirim:
-// produksi selesai + packing + perjalanan (default 10.00 + 30 + 30 menit = 11.00).
+// ReadyOffset jam paling awal pesanan boleh diproduksi di hari kirim (batas H-1,
+// default 11.00). Jam kirim sebelum jam ini wajib diproduksi H-1.
 func ReadyOffset(s bakery.Settings) time.Duration {
-	return time.Duration(s.ProductionEndHour)*time.Hour +
-		time.Duration(s.PackingMinutes+s.TravelMinutes)*time.Minute
+	return time.Duration(s.MorningCutoffHour) * time.Hour
 }
 
 // ReadyLabel ReadyOffset dalam format jam, mis. "11.00" (untuk pesan ke pengguna).
@@ -95,9 +94,17 @@ func RoundUpToStep(t time.Time, stepHours int) time.Time {
 	return day.Add(k * step)
 }
 
+// CheckDeliveryHour menolak jam kirim yang melewati jam kirim terakhir (20.00).
+func CheckDeliveryHour(deliverAt time.Time, s bakery.Settings) error {
+	if deliverAt.After(DayOf(deliverAt).Add(time.Duration(s.LastDeliveryHour) * time.Hour)) {
+		return fmt.Errorf("%w: jam kirim paling lambat %02d.00", bakery.ErrValidation, s.LastDeliveryHour)
+	}
+	return nil
+}
+
 // AlternativeTimes mencari rekomendasi jam kirim di TANGGAL YANG SAMA dengan
 // permintaan awal (tidak pernah pindah tanggal). Hanya jam yang lebih lambat,
-// paling awal jam siap (11.00) dan paling akhir LastDeliveryHour (19.00),
+// paling awal jam siap (11.00) dan paling akhir LastDeliveryHour (20.00),
 // dibulatkan ke atas per RoundHours, maksimal MaxOffers pilihan terdekat. Sebuah jam hanya valid bila
 // ada hari produksi (H-1, atau hari H bila jam >= jam siap) dengan sisa
 // kapasitas cukup. Jadi bila H-1 penuh, yang ditawarkan adalah jam mulai

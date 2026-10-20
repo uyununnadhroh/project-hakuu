@@ -1,6 +1,7 @@
 package bakery
 
 import (
+	"errors"
 	"math"
 	"testing"
 	"time"
@@ -35,9 +36,13 @@ func TestEarliestDay(t *testing.T) {
 	if got := EarliestDay(at(13, 7, 0), at(12, 8, 0), s); !got.Equal(at(12, 0, 0)) {
 		t.Errorf("senin pagi: %v", got)
 	}
+	// sebelum jam produksi selesai (18.00), hari ini masih tersedia
+	if got := EarliestDay(at(13, 7, 0), at(12, 17, 0), s); !got.Equal(at(12, 0, 0)) {
+		t.Errorf("senin sore: %v", got)
+	}
 	// setelah jam produksi selesai, hari ini tidak tersedia
-	if got := EarliestDay(at(13, 7, 0), at(12, 11, 0), s); !got.Equal(at(13, 0, 0)) {
-		t.Errorf("senin siang: %v", got)
+	if got := EarliestDay(at(13, 7, 0), at(12, 18, 0), s); !got.Equal(at(13, 0, 0)) {
+		t.Errorf("senin malam: %v", got)
 	}
 	// jauh hari: paling awal H-1
 	if got := EarliestDay(at(20, 15, 0), at(12, 8, 0), s); !got.Equal(at(19, 0, 0)) {
@@ -119,15 +124,15 @@ func TestAlternativeTimes(t *testing.T) {
 			t.Errorf("opsi %d = %+v", i, got[i])
 		}
 	}
-	// rekomendasi berhenti di 19.00 (tidak ada 20.00), tetap di tanggal yang sama
-	late := AlternativeTimes(at(13, 17, 20), 250, now, s, free)
-	if len(late) != 2 || !late[0].DeliverAt.Equal(at(13, 18, 0)) || !late[1].DeliverAt.Equal(at(13, 19, 0)) {
-		t.Errorf("harusnya hanya 18.00 dan 19.00: %+v", late)
+	// rekomendasi berhenti di 20.00 (tidak ada 21.00), tetap di tanggal yang sama
+	late := AlternativeTimes(at(13, 18, 20), 250, now, s, free)
+	if len(late) != 2 || !late[0].DeliverAt.Equal(at(13, 19, 0)) || !late[1].DeliverAt.Equal(at(13, 20, 0)) {
+		t.Errorf("harusnya hanya 19.00 dan 20.00: %+v", late)
 	}
 	// rekomendasi tidak pernah sebelum 11.00 walau H-1 masih ada sisa
 	for _, a := range AlternativeTimes(at(13, 6, 0), 100, at(12, 8, 0), s, func(time.Time) int { return 800 }) {
 		if a.DeliverAt.Before(at(13, 11, 0)) || !DayOf(a.DeliverAt).Equal(at(13, 0, 0)) {
-			t.Errorf("rekomendasi %v di luar 11.00-19.00 hari yang sama", a.DeliverAt)
+			t.Errorf("rekomendasi %v di luar 11.00-20.00 hari yang sama", a.DeliverAt)
 		}
 	}
 	// permintaan siang yang hari produksinya sudah penuh: jam lain tidak menolong
@@ -135,10 +140,24 @@ func TestAlternativeTimes(t *testing.T) {
 	if len(none) != 0 {
 		t.Errorf("harusnya tidak ada opsi: %+v", none)
 	}
-	// jam siap = 10.00 + 30 + 30 = 11.00, jadi tidak ada opsi sebelum itu di hari produksi sama
+	// batas H-1 = 11.00, jadi tidak ada opsi sebelum itu di hari produksi sama
 	for _, a := range AlternativeTimes(at(13, 7, 0), 100, at(13, 5, 0), s, func(time.Time) int { return 800 }) {
 		if a.ProductionDay.Equal(DayOf(a.DeliverAt)) && a.DeliverAt.Hour() < 11 {
 			t.Errorf("jam %v terlalu dini untuk produksi hari yang sama", a.DeliverAt)
+		}
+	}
+}
+
+func TestCheckDeliveryHour(t *testing.T) {
+	s := DefaultSettings()
+	for _, ok := range []time.Time{at(13, 7, 0), at(13, 19, 59), at(13, 20, 0)} {
+		if err := CheckDeliveryHour(ok, s); err != nil {
+			t.Errorf("%v harusnya boleh: %v", ok, err)
+		}
+	}
+	for _, bad := range []time.Time{at(13, 20, 1), at(13, 22, 0)} {
+		if err := CheckDeliveryHour(bad, s); !errors.Is(err, bakery.ErrValidation) {
+			t.Errorf("%v harusnya ditolak (lewat 20.00): %v", bad, err)
 		}
 	}
 }

@@ -40,6 +40,14 @@ func (s Service) Transition(ctx context.Context, orderID int64, action, actor st
 		if !pd.Valid || pd.String > fmtDay(DayOf(now)) {
 			return fmt.Errorf("%w: produksi baru bisa dimulai pada hari produksi (%s)", bakery.ErrState, idDate(pd.String))
 		}
+		// Jam operasional produksi: mulai ProductionStartHour (06.00).
+		set, err := s.loadSettings(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if now.Hour() < set.ProductionStartHour {
+			return fmt.Errorf("%w: produksi baru bisa dimulai pukul %02d.00", bakery.ErrState, set.ProductionStartHour)
+		}
 		to = "diproduksi"
 	case "complete":
 		if status != "diproduksi" && status != "terlambat" {

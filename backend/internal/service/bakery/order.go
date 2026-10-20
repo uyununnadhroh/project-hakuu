@@ -133,6 +133,9 @@ func (s Service) acceptOnce(ctx context.Context, in bakery.NewOrder) (*bakery.Re
 	if err != nil {
 		return nil, err
 	}
+	if err := CheckDeliveryHour(in.DeliverAt, pre); err != nil {
+		return nil, err
+	}
 	deliverDay0 := DayOf(in.DeliverAt)
 	if err := s.ensureDays(ctx, AddDays(deliverDay0, -1), deliverDay0, pre); err != nil {
 		return nil, err
@@ -260,7 +263,7 @@ func (s Service) acceptOnce(ctx context.Context, in bakery.NewOrder) (*bakery.Re
 		return out, nil
 	}
 
-	// 5. Tidak ada jam yang muat di tanggal itu (sampai 19.00): tolak.
+	// 5. Tidak ada jam yang muat di tanggal itu (sampai 20.00): tolak.
 	//    Rekomendasi hanya di hari yang sama, jadi tidak ada saran tanggal lain.
 	if noDirectDay {
 		return s.reject(ctx, tx, in, qty, "Tidak sempat diproduksi sebelum jam kirim, dan tidak ada jam kirim lain yang muat di hari itu", nil)

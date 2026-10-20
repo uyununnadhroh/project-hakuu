@@ -95,12 +95,10 @@ func (s Service) loadSettings(ctx context.Context, tx *sqlx.Tx) (bakery.Settings
 			set.MaxOffers = int(f)
 		case "batas_respons_menit":
 			set.HoldMinutes = int(f)
+		case "jam_produksi_mulai":
+			set.ProductionStartHour = int(f)
 		case "jam_produksi_selesai":
 			set.ProductionEndHour = int(f)
-		case "menit_packing":
-			set.PackingMinutes = int(f)
-		case "menit_tempuh":
-			set.TravelMinutes = int(f)
 		case "jam_kirim_terakhir":
 			set.LastDeliveryHour = int(f)
 		case "jam_peringatan_sebelum_selesai":
