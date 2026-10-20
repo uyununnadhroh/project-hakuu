@@ -25,6 +25,8 @@ type ReqCreateOrder struct {
 	Items     []Item       `json:"items"`
 	DeliverAt string       `json:"deliver_at"`
 	Note      string       `json:"note"`
+	// BahanSiap jawaban penjual atas hasil perlu_cek_bahan: kosong = belum ditanya.
+	BahanSiap *bool `json:"bahan_siap"`
 }
 
 type ReqRespondOffer struct {
@@ -124,6 +126,9 @@ type NewOrder struct {
 	Note       string
 	Actor      string
 	CreatedBy  int64 // id user yang menginput order (0 = tidak diketahui)
+	// StockReady jawaban penjual untuk pesanan besar mendadak: nil = tanyakan
+	// dulu (hasil perlu_cek_bahan), true = bahan baku cukup, false = tolak.
+	StockReady *bool
 }
 
 type Offer struct {
@@ -145,6 +150,7 @@ const (
 	OutcomeAccepted    = "diterima"
 	OutcomeNegotiation = "perlu_negosiasi"
 	OutcomeRejected    = "ditolak"
+	OutcomeCheckStock  = "perlu_cek_bahan" // pesanan besar mendadak; menunggu jawaban penjual
 )
 
 // Result hasil POST /api/orders.

@@ -19,6 +19,8 @@ type Settings struct {
 	ProductionStartHour int     // jam produksi harian dimulai (default 06.00)
 	ProductionEndHour   int     // jam produksi harian selesai (default 18.00, juga batas reservasi hari itu)
 	LastDeliveryHour    int     // jam kirim paling akhir dalam sehari (default 20.00)
+	BigOrderQty         int     // pesanan di atas jumlah ini = pesanan besar (default 400, 0 = nonaktif)
+	BigOrderLeadDays    int     // pesanan besar wajib dipesan paling lambat H-n (default 7)
 	WarnHours           int     // peringatan At risk: jam sebelum produksi harian selesai
 	Weights             Weights
 }

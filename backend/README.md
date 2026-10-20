@@ -63,7 +63,7 @@ Frontend `hakuu-web` tidak perlu diubah. Database juga tidak berubah.
 
 ## Menjalankan (Windows PowerShell + XAMPP)
 1. Start MySQL di XAMPP. Database `bakery` sudah ada (dari `db/schema.sql`).
-   Database lama: jalankan juga `db/migrations_002_laporan.sql`, `db/migrations_003_frontend.sql`, `db/migrations_004_penanggung_jawab.sql`, `db/migrations_005_jam_kirim.sql`, `db/migrations_006_paket_varian.sql`, `db/migrations_007_konfirmasi_pengiriman.sql`, dan `db/migrations_008_jam_operasional.sql` (berurutan; 002–004 dan 006 cukup sekali).
+   Database lama: jalankan juga `db/migrations_002_laporan.sql`, `db/migrations_003_frontend.sql`, `db/migrations_004_penanggung_jawab.sql`, `db/migrations_005_jam_kirim.sql`, `db/migrations_006_paket_varian.sql`, `db/migrations_007_konfirmasi_pengiriman.sql`, `db/migrations_008_jam_operasional.sql`, dan `db/migrations_009_pesanan_besar.sql` (berurutan; 002–004 dan 006 cukup sekali).
    Contoh paket pilih varian (Paket Hemat isi 2/3/4): `db/seed_paket_varian.sql` (opsional).
 2. Cek `files/etc/bakery-scheduler/bakery-scheduler.development.yaml`: DSN database dan ganti `jwt.secret`
    dengan string acak minimal 32 karakter.
@@ -85,11 +85,17 @@ Jam operasional produksi **06.00–18.00** (`jam_produksi_mulai`, `jam_produksi_
 paling lambat **20.00** (`jam_kirim_terakhir`; lebih dari itu order ditolak). Tidak ada produksi H-2.
 Saat order masuk, sistem memeriksa:
 
+0. **Pesanan besar mendadak**: lebih dari 400 pcs (`batas_pesanan_besar`) dan dipesan kurang dari
+   7 hari sebelum tanggal kirim (`min_hari_pesanan_besar`). Bahan baku dibeli di luar kota, jadi
+   sistem belum menjadwalkan apa pun: hasilnya `perlu_cek_bahan` dan penjual ditanya apakah stok
+   bahan baku cukup. Order dikirim ulang dengan `"bahan_siap": true` (lanjut ke langkah 1) atau
+   `"bahan_siap": false` (ditolak dengan alasan bahan baku).
 1. Jam kirim **< 11.00** (`batas_pagi_jam`) → wajib diproduksi **H-1**.
 2. Jam kirim **≥ 11.00** → diproduksi **H-1** bila kapasitas masih cukup; bila tidak, produksi
    **dialihkan ke hari H (hari kirim)** bila kapasitas hari H cukup.
 3. Masih tidak muat → sistem mencoba menggeser order lain yang skor prioritasnya lebih rendah
-   (hanya ke H-1/hari H milik order itu sendiri), lalu lembur (`lembur_maks`).
+   (hanya ke H-1/hari H milik order itu sendiri). Order yang sudah diterima tidak pernah dibatalkan
+   atau digeser sampai terlambat. Lembur tidak dipakai (`lembur_maks` = 0).
 4. Masih tidak muat → hasil `perlu_negosiasi` dengan rekomendasi jam kirim **di tanggal yang sama**,
    mulai 11.00 (produksi hari H) sampai paling lambat 20.00, maksimal `maks_tawaran_jam` pilihan.
 5. Tidak ada jam yang muat sampai 20.00 → ditolak. Tidak ada saran pindah tanggal.
@@ -103,7 +109,7 @@ dipindahkan otomatis.
 |---|---|---|
 | POST | /api/login | Login, mengembalikan token |
 | GET | /api/users | Daftar email/akun aktif yang bisa masuk (tanpa password) |
-| POST | /api/orders | Terima order: diterima / perlu_negosiasi / ditolak |
+| POST | /api/orders | Terima order: diterima / perlu_negosiasi / perlu_cek_bahan / ditolak (body opsional `"bahan_siap": true/false`) |
 | GET | /api/orders?limit=1000, /api/orders/{id} | Daftar (maks. 1000) dan detail, termasuk `created_by_nama` & `created_by_email` (penanggung jawab) |
 | POST | /api/orders/{id}/start, /complete, /cancel | Ubah status |
 | GET | /api/schedule?from=YYYY-MM-DD&days=7 | Kapasitas dan order per hari |

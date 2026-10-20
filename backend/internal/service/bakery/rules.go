@@ -19,6 +19,7 @@ func DefaultSettings() bakery.Settings {
 		MinScoreGap: 0.05, MaxOffers: 3, HoldMinutes: 60,
 		ProductionStartHour: 6, ProductionEndHour: 18,
 		LastDeliveryHour: 20, WarnHours: 2,
+		BigOrderQty: 400, BigOrderLeadDays: 7,
 		Weights: bakery.Weights{J: 0.648, Q: 0.230, W: 0.122},
 	}
 }
@@ -100,6 +101,17 @@ func CheckDeliveryHour(deliverAt time.Time, s bakery.Settings) error {
 		return fmt.Errorf("%w: jam kirim paling lambat %02d.00", bakery.ErrValidation, s.LastDeliveryHour)
 	}
 	return nil
+}
+
+// IsRushBigOrder pesanan besar (di atas BigOrderQty) yang dipesan kurang dari
+// BigOrderLeadDays hari sebelum tanggal kirim. Bahan bakunya dibeli di luar
+// kota, jadi penjual perlu memastikan stok bahan baku sebelum menerima.
+func IsRushBigOrder(qty int, deliverAt, now time.Time, s bakery.Settings) bool {
+	if s.BigOrderQty <= 0 || qty <= s.BigOrderQty {
+		return false
+	}
+	days := int(math.Round(DayOf(deliverAt).Sub(DayOf(now)).Hours() / 24))
+	return days < s.BigOrderLeadDays
 }
 
 // AlternativeTimes mencari rekomendasi jam kirim di TANGGAL YANG SAMA dengan

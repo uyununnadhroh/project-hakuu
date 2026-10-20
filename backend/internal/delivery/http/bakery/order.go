@@ -29,8 +29,11 @@ func (h *Handler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp.StatusCode = http.StatusCreated
-	if result.Outcome == bakery.OutcomeRejected {
+	switch result.Outcome {
+	case bakery.OutcomeRejected:
 		resp.StatusCode = http.StatusUnprocessableEntity
+	case bakery.OutcomeCheckStock: // belum ada yang disimpan
+		resp.StatusCode = http.StatusOK
 	}
 	resp.Data = result
 	logInfo(r)

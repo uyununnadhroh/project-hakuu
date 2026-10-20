@@ -101,6 +101,10 @@ func (s Service) loadSettings(ctx context.Context, tx *sqlx.Tx) (bakery.Settings
 			set.ProductionEndHour = int(f)
 		case "jam_kirim_terakhir":
 			set.LastDeliveryHour = int(f)
+		case "batas_pesanan_besar":
+			set.BigOrderQty = int(f)
+		case "min_hari_pesanan_besar":
+			set.BigOrderLeadDays = int(f)
 		case "jam_peringatan_sebelum_selesai":
 			set.WarnHours = int(f)
 		}

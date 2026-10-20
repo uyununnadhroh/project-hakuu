@@ -71,7 +71,7 @@ func (s Service) CreateOrder(ctx context.Context, req bakery.ReqCreateOrder, act
 		req.CustomerID = &cid
 	}
 	return s.AcceptOrder(ctx, bakery.NewOrder{CustomerID: req.CustomerID, Items: req.Items, DeliverAt: t, Note: req.Note,
-		Actor: actor.Nama, CreatedBy: actor.UserID})
+		Actor: actor.Nama, CreatedBy: actor.UserID, StockReady: req.BahanSiap})
 }
 
 // priceItems menghitung harga dan beban kapasitas. Qty tiap item adalah jumlah
@@ -110,8 +110,12 @@ func (s Service) priceItems(ctx context.Context, tx *sqlx.Tx, items []bakery.Ite
 }
 
 // AcceptOrder menjalankan alur penerimaan order dalam SATU transaksi:
-// reservasi langsung -> geser order lain -> lembur -> rekomendasi jam kirim ->
-// tawaran tanggal lain / tolak.
+// cek pesanan besar mendadak -> reservasi langsung -> geser order lain ->
+// lembur -> rekomendasi jam kirim -> tolak.
+//
+// Pesanan besar mendadak (lihat IsRushBigOrder) tidak langsung dijadwalkan:
+// bila penjual belum menjawab (in.StockReady nil) hasilnya perlu_cek_bahan dan
+// tidak ada yang disimpan; frontend mengirim ulang order dengan jawaban penjual.
 func (s Service) AcceptOrder(ctx context.Context, in bakery.NewOrder) (*bakery.Result, error) {
 	return retryDeadlock(func() (*bakery.Result, error) { return s.acceptOnce(ctx, in) })
 }
@@ -156,6 +160,22 @@ func (s Service) acceptOnce(ctx context.Context, in bakery.NewOrder) (*bakery.Re
 		return nil, err
 	}
 
+	// 0. Pesanan besar mendadak: tanyakan stok bahan baku ke penjual dulu.
+	rush := IsRushBigOrder(qty, in.DeliverAt, now, set)
+	if rush && in.StockReady == nil {
+		_ = tx.Rollback()
+		return &bakery.Result{Outcome: bakery.OutcomeCheckStock, Reason: fmt.Sprintf(
+			"Pesanan %d pcs termasuk pesanan besar (di atas %d pcs) dan dipesan kurang dari %d hari sebelum pengiriman. "+
+				"Bahan baku dibeli di luar kota, pastikan stok bahan baku cukup sebelum menerima pesanan ini.",
+			qty, set.BigOrderQty, set.BigOrderLeadDays)}, nil
+	}
+	if rush && !*in.StockReady {
+		return s.reject(ctx, tx, in, qty, fmt.Sprintf(
+			"Pesanan di atas %d pcs harus dipesan paling lambat %d hari sebelum pengiriman, karena bahan baku "+
+				"dibeli di luar kota dan tidak tersedia di toko sekitar. Stok bahan baku saat ini tidak mencukupi.",
+			set.BigOrderQty, set.BigOrderLeadDays), nil)
+	}
+
 	// Hari produksi yang boleh: H-1, lalu hari H (hanya bila jam kirim >= jam siap 11.00).
 	deadline := DeadlineDay(in.DeliverAt, set)
 	earliest := EarliestDay(in.DeliverAt, now, set)
@@ -186,6 +206,12 @@ func (s Service) acceptOnce(ctx context.Context, in bakery.NewOrder) (*bakery.Re
 		InWindow: InWindow(in.DeliverAt, now, set)}
 	if err := s.bakery.UpdateOrderKode(ctx, tx, id, o.Kode); err != nil {
 		return nil, err
+	}
+	if rush {
+		if err := s.audit(ctx, tx, id, o.Actor, "pesanan_besar_mendadak", nil, map[string]int{"jumlah": qty},
+			"Pesanan besar dipesan mendadak; penjual menyatakan stok bahan baku cukup"); err != nil {
+			return nil, err
+		}
 	}
 	for _, l := range lines {
 		itemID, err := s.bakery.InsertOrderItem(ctx, tx, id, l.ProductID, l.Qty, l.Price)

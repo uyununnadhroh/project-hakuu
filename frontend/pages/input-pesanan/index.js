@@ -9,7 +9,7 @@ import PackageCard from '../../components/pesanan/PackageCard';
 import { fmtTgl, ymd } from '../../utils/orderStatus';
 import { getNama, getEmail } from '../../utils/storage';
 
-function CapacitySidebar({ items, preview, onPilihJam }) {
+function CapacitySidebar({ items, preview, pesananBesar, onPilihJam }) {
   const CAPACITY_DAILY = preview?.capacity ?? 800;
   const totalBox   = items.reduce((s, i) => s + i.qty, 0);
   // Beban kapasitas = box x bobot produk, dibulatkan ke atas (sama dengan perhitungan server).
@@ -90,6 +90,12 @@ function CapacitySidebar({ items, preview, onPilihJam }) {
             {preview?.bolehHariH
               ? '✕ Kapasitas H-1 dan hari kirim tidak cukup. Sistem akan mencoba menggeser pesanan lain; bila tetap penuh, pesanan ditolak.'
               : '✕ Kapasitas H-1 tidak cukup. Sistem akan mencoba menggeser pesanan lain terlebih dahulu.'}
+          </div>
+        )}
+        {pesananBesar && (
+          <div className="bg-[#fdf6ec] border border-[#e8c98a] rounded-xl p-3 text-xs text-[#7e4722]">
+            ⚠ Pesanan besar (di atas {pesananBesar.batas} pcs) seharusnya dipesan paling lambat {pesananBesar.minHari} hari
+            sebelum pengiriman, karena bahan baku dibeli di luar kota. Saat disimpan, penjual akan ditanya apakah stok bahan baku cukup.
           </div>
         )}
         {preview?.lewatBatas && (
@@ -177,6 +183,7 @@ export default function InputPesanan() {
   const [error, setError]             = useState('');
   const [result, setResult]           = useState(null);   // hasil diterima / perlu_negosiasi
   const [rejected, setRejected]       = useState(null);   // hasil ditolak (422)
+  const [cekBahan, setCekBahan]       = useState(null);   // hasil perlu_cek_bahan: menunggu jawaban penjual
   const [preview, setPreview]         = useState(null);
   const [qtyDraft, setQtyDraft]       = useState({});     // teks qty yang sedang diketik (boleh kosong)
 
@@ -211,6 +218,18 @@ export default function InputPesanan() {
   const maxRek = Number(prm.maks_tawaran_jam ?? 3);
   const stepJam = Math.max(1, Number(prm.pembulatan_jam ?? 1));
   const load = Math.ceil(orderItems.reduce((s, i) => s + i.qty * i.bobot, 0) - 1e-9);
+
+  // Pesanan besar mendadak (meniru server): di atas batas_pesanan_besar dan dipesan
+  // kurang dari min_hari_pesanan_besar hari sebelum tanggal kirim.
+  const batasBesar = Number(prm.batas_pesanan_besar ?? 400);
+  const minHariBesar = Number(prm.min_hari_pesanan_besar ?? 7);
+  const hariSebelumKirim = tanggalKirim
+    ? Math.round((new Date(`${tanggalKirim}T00:00:00`) - new Date(`${ymd()}T00:00:00`)) / 86400000) : null;
+  const pesananBesar = batasBesar > 0 && load > batasBesar && hariSebelumKirim !== null && hariSebelumKirim < minHariBesar
+    ? { batas: batasBesar, minHari: minHariBesar } : null;
+
+  // Jawaban stok bahan baku hanya berlaku untuk isi pesanan yang ditanyakan.
+  useEffect(() => { setCekBahan(null); }, [orderItems, tanggalKirim, jamKirim]);
 
   // Pratinjau kapasitas, meniru aturan server:
   //   H-1 dulu; hari H hanya bila jam kirim >= jam siap (11.00). Tidak ada H-2.
@@ -324,10 +343,12 @@ export default function InputPesanan() {
     updateQty(id, qty);
   }
 
-  async function handleSimpan() {
+  // bahanSiap: undefined = belum ditanya, true/false = jawaban penjual soal stok bahan baku
+  async function handleSimpan(bahanSiap) {
     setSaving(true);
     setError('');
     setRejected(null);
+    setCekBahan(null);
     try {
       const res = await api.insertOrder({
         customer: { nama: pembeli.trim(), telepon: telepon.trim(), alamat: alamat.trim() },
@@ -340,8 +361,10 @@ export default function InputPesanan() {
         })),
         deliver_at: `${tanggalKirim} ${jamKirim}`,
         note: catatan.trim(),
+        ...(bahanSiap !== undefined && { bahan_siap: bahanSiap }),
       });
-      setResult(res);
+      if (res.outcome === 'perlu_cek_bahan') setCekBahan(res);
+      else setResult(res);
     } catch (e) {
       if (e.status === 422 && e.data?.outcome === 'ditolak') setRejected(e.data);
       else setError(e.message);
@@ -359,7 +382,7 @@ export default function InputPesanan() {
 
   function resetForm() {
     setResult(null); setStep(1); setPembeli(''); setTelepon(''); setAlamat('');
-    setTanggalKirim(''); setJamKirim(''); setCatatan(''); setOrderItems([]);
+    setTanggalKirim(''); setJamKirim(''); setCatatan(''); setOrderItems([]); setCekBahan(null);
   }
 
   if (result) {
@@ -693,6 +716,23 @@ export default function InputPesanan() {
                 Periksa kembali detail pesanan sebelum disimpan.
               </p>
               <ErrorBanner message={error} />
+              {cekBahan && (
+                <div className="bg-[#fdf6ec] border border-[#e8c98a] rounded-xl p-4 flex flex-col gap-2">
+                  <p className="text-[#7e4722] text-sm font-semibold">Apakah stok bahan baku cukup?</p>
+                  <p className="text-[#7e4722] text-xs">{cekBahan.reason}</p>
+                  <p className="text-[#8a7768] text-xs">
+                    Bila cukup, pesanan lanjut ke pengecekan kapasitas seperti biasa. Bila tidak, pesanan ditolak dengan alasan bahan baku.
+                  </p>
+                  <div className="flex gap-2 flex-wrap pt-1">
+                    <button onClick={() => handleSimpan(true)} disabled={saving} className="btn-primary text-xs h-9 px-3 disabled:opacity-60">
+                      Ya, bahan baku cukup
+                    </button>
+                    <button onClick={() => handleSimpan(false)} disabled={saving} className="btn-secondary text-[#4c0c13] text-xs h-9 px-3 disabled:opacity-60">
+                      Tidak cukup, tolak pesanan
+                    </button>
+                  </div>
+                </div>
+              )}
               {rejected && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex flex-col gap-2">
                   <p className="text-[#b74b40] text-sm font-semibold">Pesanan ditolak: {rejected.reason}</p>
@@ -712,7 +752,7 @@ export default function InputPesanan() {
               )}
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setStep(2)} className="btn-secondary">← Kembali</button>
-                <button onClick={handleSimpan} disabled={saving || variantsIncomplete || orderItems.length === 0 || lewatBatas} className="btn-primary flex-1 justify-center disabled:opacity-60">
+                <button onClick={() => handleSimpan()} disabled={saving || !!cekBahan || variantsIncomplete || orderItems.length === 0 || lewatBatas} className="btn-primary flex-1 justify-center disabled:opacity-60">
                   {saving ? 'Menyimpan…' : 'Simpan Pesanan'}
                 </button>
               </div>
@@ -721,7 +761,7 @@ export default function InputPesanan() {
         </div>
 
         {/* Right: capacity sidebar */}
-        <CapacitySidebar items={orderItems} preview={sidebarPreview} onPilihJam={setJamKirim} />
+        <CapacitySidebar items={orderItems} preview={sidebarPreview} pesananBesar={pesananBesar} onPilihJam={setJamKirim} />
       </div>
     </div>
   );

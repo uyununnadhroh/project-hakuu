@@ -161,3 +161,29 @@ func TestCheckDeliveryHour(t *testing.T) {
 		}
 	}
 }
+
+func TestIsRushBigOrder(t *testing.T) {
+	s := DefaultSettings()
+	now := at(12, 9, 0) // Senin 12 Okt
+	cases := []struct {
+		name    string
+		qty     int
+		deliver time.Time
+		want    bool
+	}{
+		{"tepat 400, besok", 400, at(13, 10, 0), false}, // tepat 400 belum termasuk besar
+		{"besar, besok", 800, at(13, 10, 0), true},      // kasus dosen
+		{"besar, H-6", 401, at(18, 10, 0), true},
+		{"besar, tepat H-7", 800, at(19, 7, 0), false},
+		{"besar, lebih dari H-7", 800, at(25, 10, 0), false},
+	}
+	for _, c := range cases {
+		if got := IsRushBigOrder(c.qty, c.deliver, now, s); got != c.want {
+			t.Errorf("%s: %v, want %v", c.name, got, c.want)
+		}
+	}
+	s.BigOrderQty = 0
+	if IsRushBigOrder(800, at(13, 10, 0), now, s) {
+		t.Error("batas 0 = aturan nonaktif")
+	}
+}

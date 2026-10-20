@@ -186,7 +186,8 @@ INSERT INTO settings (kunci, nilai) VALUES
   ('lama_menunggu_maks_jam','96'), ('pembulatan_jam','1'),
   ('ambang_selisih_skor','0.05'),  ('maks_tawaran_jam','3'),
   ('batas_respons_menit','60'),    ('jam_produksi_mulai','6'),
-  ('jam_produksi_selesai','18'),   ('jam_kirim_terakhir','20');
+  ('jam_produksi_selesai','18'),   ('jam_kirim_terakhir','20'),
+  ('batas_pesanan_besar','400'),   ('min_hari_pesanan_besar','7');
 
 INSERT INTO ahp_weights (matriks, bobot_j, bobot_q, bobot_w, cr, aktif)
 VALUES ('[[1,3,5],[0.3333333333,1,2],[0.2,0.5,1]]', 0.648, 0.230, 0.122, 0.003, TRUE);

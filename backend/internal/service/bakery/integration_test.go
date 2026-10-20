@@ -225,6 +225,43 @@ func TestConcurrentNoOversell(t *testing.T) {
 	}
 }
 
+// Kasus dosen: A (50 pcs) masuk lebih dulu, lalu B (800 pcs) untuk besok.
+// B pesanan besar mendadak: sistem bertanya stok bahan baku dulu tanpa
+// menyimpan apa pun; bila penjual menjawab tidak cukup, B ditolak dengan alasan.
+// A tidak pernah tersentuh.
+func TestScenarioRushBigOrder(t *testing.T) {
+	e := setup(t, 800, 0)
+	ctx := context.Background()
+	a := e.order(t, 50, at(13, 9, 0)) // Senin 08.00, kirim Selasa 09.00
+	if a.Outcome != bakery.OutcomeAccepted || a.ProductionDay != "2026-10-12" {
+		t.Fatalf("A: %+v", a)
+	}
+	*e.now = at(12, 9, 0)
+	newB := func(ready *bool) *bakery.Result {
+		res, err := e.svc.AcceptOrder(ctx, bakery.NewOrder{Items: []bakery.Item{{ProductID: e.pid, Qty: 800}},
+			DeliverAt: at(13, 10, 0), StockReady: ready})
+		if err != nil {
+			t.Fatalf("B: %v", err)
+		}
+		return res
+	}
+	if r := newB(nil); r.Outcome != bakery.OutcomeCheckStock || r.OrderID != 0 {
+		t.Fatalf("harusnya tanya stok bahan baku: %+v", r)
+	}
+	no, yes := false, true
+	if r := newB(&no); r.Outcome != bakery.OutcomeRejected || !strings.Contains(r.Reason, "luar kota") {
+		t.Fatalf("bahan baku tidak cukup -> ditolak dengan alasan: %+v", r)
+	}
+	// bahan cukup -> masuk alur biasa; Senin sisa 750 dan A tidak bisa digeser, jadi
+	// B tidak muat di Senin (ditawari jam kirim lain atau ditolak), bukan diterima
+	if r := newB(&yes); r.Outcome == bakery.OutcomeAccepted {
+		t.Fatalf("kapasitas tidak cukup, B tidak boleh diterima: %+v", r)
+	}
+	if e.used(t, "2026-10-12") != 50 {
+		t.Fatalf("A harus tetap satu-satunya di Senin: %d", e.used(t, "2026-10-12"))
+	}
+}
+
 // X (400 pcs) mengisi Senin, Y (300 pcs) terpaksa Selasa. Setelah X dibatalkan,
 // job per jam harus memajukan Y ke Senin.
 func TestRebalancePullsForward(t *testing.T) {
