@@ -106,6 +106,12 @@ function DetailModal({ order, onClose, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
+  // DEBUG sementara
+  useEffect(() => {
+    console.log('DETAIL', order.dbId, order.id, d);
+    if (d) console.log('ITEMS', d.items, 'isArray:', Array.isArray(d.items), 'length:', d.items?.length);
+  }, [d]);
+
   async function offerAction(fn) {
     setBusy(true);
     setErr('');
@@ -131,7 +137,7 @@ function DetailModal({ order, onClose, onChanged }) {
           <button onClick={onClose} className="text-[#8a7768] hover:text-[#2b1d16] text-xl leading-none">×</button>
         </div>
 
-        <div className="flex flex-col gap-5 p-6 overflow-y-auto">
+        <div className="flex flex-col gap-5 p-6 overflow-y-auto [&>*]:shrink-0">
           {loading && <p className="text-[#8a7768] text-sm">Memuat…</p>}
           <ErrorBanner message={error || err} />
           {d && (
@@ -152,7 +158,7 @@ function DetailModal({ order, onClose, onChanged }) {
                 {d.note && <div className="col-span-2"><p className="text-[#8a7768] text-xs">Catatan</p><p className="text-[#2b1d16]">{d.note}</p></div>}
               </div>
 
-              <div className="border border-[#eadfd0] rounded-xl overflow-hidden">
+              <div className="border border-[#eadfd0] rounded-xl overflow-hidden shrink-0">
                 <div className="bg-[#faf6ee] flex px-4 h-9 items-center text-xs font-medium text-[#7e4722]">
                   <p className="flex-1">Produk</p><p className="w-16">Box</p><p className="w-24 text-right">Subtotal</p>
                 </div>
@@ -380,13 +386,13 @@ export default function DaftarPesanan() {
           </div>
 
           <div className="bg-[#faf6ee] flex items-center px-6 h-10 gap-4 border-b border-[#eadfd0]">
-            <p className="w-[96px] text-xs font-medium text-[#7e4722]">Kode</p>
+            <p className="w-[96px] shrink-0 text-xs font-medium text-[#7e4722]">Kode</p>
             <p className="flex-1 min-w-0 text-xs font-medium text-[#7e4722]">Pembeli</p>
-            <p className="w-[150px] text-xs font-medium text-[#7e4722]">Produk</p>
-            <p className="w-[60px] text-xs font-medium text-[#7e4722]">Qty box</p>
-            <p className="w-[140px] text-xs font-medium text-[#7e4722]">Kirim / produksi</p>
-            <p className="w-[120px] text-xs font-medium text-[#7e4722]">Status</p>
-            <p className="w-[36px] text-xs font-medium text-[#7e4722]">Aksi</p>
+            <p className="w-[300px] shrink-0 text-xs font-medium text-[#7e4722]">Produk</p>
+            <p className="w-[60px] shrink-0 text-xs font-medium text-[#7e4722]">Qty box</p>
+            <p className="w-[140px] shrink-0 text-xs font-medium text-[#7e4722]">Kirim / Produksi</p>
+            <p className="w-[150px] shrink-0 text-xs font-medium text-[#7e4722]">Status</p>
+            <p className="w-[36px] shrink-0 text-xs font-medium text-[#7e4722]">Aksi</p>
           </div>
 
           {loading && !orders && <div className="px-6 py-10 text-center text-[#8a7768] text-sm">Memuat pesanan…</div>}
@@ -401,14 +407,26 @@ export default function DaftarPesanan() {
                 <p className="text-sm text-[#2b1d16] truncate">{o.pembeli}</p>
                 {o.pj && <p className="text-xs text-[#8a7768] truncate" title={o.pjEmail || o.pj}>PJ: {o.pj}</p>}
               </div>
-              <p className="w-[150px] text-sm font-medium text-[#4c0c13] truncate" title={o.produk}>{o.produk}</p>
-              <p className="w-[60px] text-sm text-[#2b1d16]">{o.qty}</p>
-              <div className="w-[140px]">
-                <p className="text-sm text-[#2b1d16]">{fmtTgl(o.tanggalKirim)} · {o.jamKirim}</p>
-                <p className="text-xs text-[#8a7768]">{o.tanggalProduksi ? `${fmtTgl(o.tanggalProduksi)} · ${hLabel(o.tanggalKirim, o.tanggalProduksi)}` : 'Menunggu negosiasi'}</p>
+              <p className="w-[300px] shrink-0 text-sm font-medium text-[#4c0c13] truncate" title={o.produk} >
+                {o.produk}
+              </p>
+              <p className="w-[60px] shrink-0 text-sm text-[#2b1d16]">
+                {o.qty}
+              </p>
+              <div className="w-[140px] shrink-0">
+                <p className="text-sm text-[#2b1d16]">
+                  {fmtTgl(o.tanggalKirim)} · {o.jamKirim}
+                </p>
+                <p className="text-xs text-[#8a7768]">
+                  {o.tanggalProduksi
+                    ? `${fmtTgl(o.tanggalProduksi)} · ${hLabel(o.tanggalKirim, o.tanggalProduksi)}`
+                    : 'Menunggu negosiasi'}
+                </p>
               </div>
-              <div className="w-[120px]">
-                <span className={badgeMap[o.statusOtomatis] ?? badgeMap['Diterima']}>{statusText(o)}</span>
+              <div className="w-[150px] shrink-0">
+                <span className={badgeMap[o.statusOtomatis] ?? badgeMap['Diterima']}>
+                  {statusText(o)}
+                </span>
               </div>
               <div className="w-[36px] relative">
                 <button onClick={() => setMenuOpen(menuOpen === o.id ? null : o.id)} className="text-[#8a7768] hover:text-[#2b1d16]">
