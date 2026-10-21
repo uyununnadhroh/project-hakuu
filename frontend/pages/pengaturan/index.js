@@ -173,7 +173,7 @@ export default function Pengaturan() {
         </div>
 
         {/* Akun yang bisa mengakses website */}
-        <AkunTerdaftar />
+        {/* <AkunTerdaftar /> */}
 
         {/* Production settings */}
         <div className="card p-6 flex flex-col gap-5">
