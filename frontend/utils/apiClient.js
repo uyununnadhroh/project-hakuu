@@ -17,7 +17,7 @@ export class ApiError extends Error {
 }
 
 const apiClient = axios.create({
-    baseURL: (process.env.NEXT_PUBLIC_BASE_API_URL || "http://localhost:8080").replace(/\/$/, ""),
+    baseURL: (process.env.NEXT_PUBLIC_BASE_API_URL).replace(/\/$/, ""),
     timeout: 60000,
 });
 

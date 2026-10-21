@@ -331,9 +331,9 @@ export default function KelolaProduk() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-[#2b1d16] text-[30px] font-normal">Kelola Produk</h1>
-          <p className="text-[#8a7768] text-sm mt-1">
+          {/* <p className="text-[#8a7768] text-sm mt-1">
             Atur produk dan bobotnya agar pengecekan kapasitas tetap akurat.
-          </p>
+          </p> */}
         </div>
         <div className="flex gap-3">
           <button onClick={() => setModal('kategori')} className="btn-secondary text-[#4c0c13]">
@@ -348,7 +348,7 @@ export default function KelolaProduk() {
       <ErrorBanner message={err || prods.error || catsLoad.error} />
 
       {/* Weight rule cards */}
-      <div className="grid grid-cols-3 gap-5">
+      {/* <div className="grid grid-cols-3 gap-5">
         <div className="card p-6 flex flex-col gap-2.5">
           <div className="flex items-start justify-between">
             <p className="text-[#2b1d16] text-lg font-semibold">Tanpa topping</p>
@@ -379,7 +379,7 @@ export default function KelolaProduk() {
           <p className="text-[#2b1d16] text-[22px] font-semibold leading-[42px]">0,41 × topping + sisa ÷ isi</p>
           <p className="text-[#8a7768] text-sm">Isi 3 (1 topping + 2 polos) = 1,08</p>
         </div>
-      </div>
+      </div> */}
 
       {/* Category tabs */}
       <div className="flex gap-3 flex-wrap">
@@ -457,9 +457,9 @@ export default function KelolaProduk() {
             <p className="w-[120px] text-sm text-[#2b1d16]">Rp {p.price.toLocaleString('id-ID')}</p>
             <div className="w-[180px]">
               <p className="text-sm text-[#78685c]">{p.jenis}</p>
-              <p className="text-xs text-[#8a7768]">
+              {/* <p className="text-xs text-[#8a7768]">
                 Isi {p.isiBox}{p.jenis === 'Campuran' ? ` (${p.isiTopping} topping)` : ''} · bobot {Number(p.bobot).toLocaleString('id-ID', { minimumFractionDigits: 2 })}
-              </p>
+              </p> */}
             </div>
             <div className="w-[120px]">
               <button onClick={() => handleToggle(p)} className="block">
