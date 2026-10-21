@@ -42,7 +42,11 @@ type ReqProduct struct {
 	Harga    float64  `json:"harga"`
 	Kategori string   `json:"kategori"`
 	Jenis    string   `json:"jenis"`
-	Bobot    *float64 `json:"bobot"`
+	Bobot    *float64 `json:"bobot"` // kosong = dihitung dari jenis dan isi box
+	// Isi box (jumlah roti per box, default 3) dan jumlah roti bertopping di
+	// dalamnya (hanya untuk jenis campuran).
+	IsiBox     *int `json:"isi_box"`
+	IsiTopping *int `json:"isi_topping"`
 	// Paket pilih varian: isi paket (0 = produk biasa) dan daftar variannya.
 	MaksVarian int            `json:"maks_varian"`
 	Variants   []VariantInput `json:"variants"`
@@ -55,6 +59,9 @@ type ReqPatchProduct struct {
 	Kategori *string  `json:"kategori"`
 	Jenis    *string  `json:"jenis"`
 	Bobot    *float64 `json:"bobot"`
+	// Mengubah jenis/isi box tanpa bobot = bobot dihitung ulang dari rumus.
+	IsiBox     *int `json:"isi_box"`
+	IsiTopping *int `json:"isi_topping"`
 	// Variants bila diisi menggantikan seluruh daftar varian produk:
 	// varian lama yang tidak dikirim dihapus (atau dinonaktifkan bila sudah pernah dipesan).
 	MaksVarian *int            `json:"maks_varian"`
@@ -299,6 +306,9 @@ type Product struct {
 	Kategori string  `json:"kategori"`
 	Jenis    string  `json:"jenis"`
 	Bobot    float64 `json:"bobot"`
+	// IsiBox jumlah roti per box; IsiTopping jumlah roti bertopping di dalamnya.
+	IsiBox     int `json:"isi_box"`
+	IsiTopping int `json:"isi_topping"`
 	// MaksVarian > 0: paket pilih varian, pembeli wajib memilih tepat sejumlah ini.
 	MaksVarian int              `json:"maks_varian"`
 	Variants   []ProductVariant `json:"variants"`
@@ -319,6 +329,8 @@ type ProductInput struct {
 	Kategori   string
 	Jenis      string
 	Bobot      *float64
+	IsiBox     *int
+	IsiTopping *int
 	MaksVarian int
 	Variants   []VariantInput
 }

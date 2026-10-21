@@ -4,7 +4,7 @@ package bakery
 const (
 	// ---------- produk ----------
 	listProducts  = "ListProducts"
-	qListProducts = `SELECT id, nama, harga, aktif, kategori, jenis, bobot, maks_varian FROM products ORDER BY id`
+	qListProducts = `SELECT id, nama, harga, aktif, kategori, jenis, bobot, isi_box, isi_topping, maks_varian FROM products ORDER BY id`
 
 	// semua varian (termasuk nonaktif, untuk Kelola Produk); Input Pesanan hanya memakai yang aktif
 	listProductVariants  = "ListProductVariants"
@@ -39,7 +39,7 @@ const (
 	qCountProductByID = `SELECT COUNT(*) FROM products WHERE id = ?`
 
 	insProduct  = "InsProduct"
-	qInsProduct = `INSERT INTO products (nama, harga, kategori, jenis, bobot, maks_varian) VALUES (?,?,?,?,?,?)`
+	qInsProduct = `INSERT INTO products (nama, harga, kategori, jenis, bobot, isi_box, isi_topping, maks_varian) VALUES (?,?,?,?,?,?,?,?)`
 
 	updProductNama  = "UpdProductNama"
 	qUpdProductNama = `UPDATE products SET nama = ? WHERE id = ?`
@@ -53,8 +53,11 @@ const (
 	updProductKategori  = "UpdProductKategori"
 	qUpdProductKategori = `UPDATE products SET kategori = ? WHERE id = ?`
 
-	updProductJenisBobot  = "UpdProductJenisBobot"
-	qUpdProductJenisBobot = `UPDATE products SET jenis = ?, bobot = ? WHERE id = ?`
+	getProductKomposisi  = "GetProductKomposisi"
+	qGetProductKomposisi = `SELECT jenis, isi_box, isi_topping FROM products WHERE id = ?`
+
+	updProductKomposisi  = "UpdProductKomposisi"
+	qUpdProductKomposisi = `UPDATE products SET jenis = ?, isi_box = ?, isi_topping = ?, bobot = ? WHERE id = ?`
 
 	updProductBobot  = "UpdProductBobot"
 	qUpdProductBobot = `UPDATE products SET bobot = ? WHERE id = ?`

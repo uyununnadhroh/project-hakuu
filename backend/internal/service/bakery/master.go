@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	"bakery-scheduler/internal/entity/bakery"
@@ -12,13 +13,32 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// Bobot kapasitas bawaan per jenis produksi. Produk bertopping butuh waktu
-// lebih lama (800 box/hari tanpa topping vs sekitar 650 box/hari bila
-// didominasi topping, jadi 800/650 = 1,23).
-var jenisBobot = map[string]float64{
-	"tanpa_topping": 1.00,
-	"bertopping":    1.23,
-	"campuran":      1.10,
+// Patokan bobot kapasitas: 1 box ISI 3 roti bertopping = 1,23 (800 box/hari
+// tanpa topping vs sekitar 650 box/hari bertopping, 800/650 = 1,23). Topping
+// dikerjakan per biji, jadi tiap roti bertopping berbobot 1,23/3 = 0,41. Roti
+// tanpa topping dikerjakan per loyang, jadi bobotnya 1,00 per box berapa pun isinya.
+const (
+	isiPatokan   = 3
+	bobotPatokan = 1.23
+)
+
+var jenisValid = map[string]bool{"tanpa_topping": true, "bertopping": true, "campuran": true}
+
+// HitungBobot bobot kapasitas per box (dibulatkan 2 desimal):
+//
+//	tanpa topping : 1,00
+//	bertopping    : 0,41 x isi box
+//	campuran      : 0,41 x roti bertopping + roti tanpa topping / isi box
+func HitungBobot(jenis string, isi, topping int) float64 {
+	perRoti := bobotPatokan / isiPatokan
+	b := 1.0
+	switch jenis {
+	case "bertopping":
+		b = perRoti * float64(isi)
+	case "campuran":
+		b = perRoti*float64(topping) + float64(isi-topping)/float64(isi)
+	}
+	return math.Round(b*100) / 100
 }
 
 func normJenis(j string) (string, error) {
@@ -26,10 +46,30 @@ func normJenis(j string) (string, error) {
 	if j == "" {
 		return "tanpa_topping", nil
 	}
-	if _, ok := jenisBobot[j]; !ok {
+	if !jenisValid[j] {
 		return "", fmt.Errorf("%w: jenis harus tanpa_topping, bertopping, atau campuran", bakery.ErrValidation)
 	}
 	return j, nil
+}
+
+// normKomposisi memeriksa isi box dan jumlah roti bertopping sesuai jenis.
+// Bertopping = semua roti bertopping, tanpa topping = 0; campuran wajib berisi
+// keduanya.
+func normKomposisi(jenis string, isi, topping int) (int, int, error) {
+	if isi < 1 || isi > 50 {
+		return 0, 0, fmt.Errorf("%w: isi box harus antara 1 dan 50 roti", bakery.ErrValidation)
+	}
+	switch jenis {
+	case "bertopping":
+		topping = isi
+	case "campuran":
+		if topping < 1 || topping >= isi {
+			return 0, 0, fmt.Errorf("%w: produk campuran berisi roti bertopping dan tanpa topping, jadi jumlah roti bertopping harus 1 sampai %d", bakery.ErrValidation, isi-1)
+		}
+	default:
+		topping = 0
+	}
+	return isi, topping, nil
 }
 
 func checkBobot(b float64) error {
@@ -89,7 +129,18 @@ func (s Service) AddProduct(ctx context.Context, in bakery.ProductInput) (int64,
 	if err != nil {
 		return 0, err
 	}
-	bobot := jenisBobot[jenis]
+	isi, topping := isiPatokan, 1 // campuran tanpa rincian: 1 bertopping + sisanya tanpa topping
+	if in.IsiBox != nil {
+		isi = *in.IsiBox
+	}
+	if in.IsiTopping != nil {
+		topping = *in.IsiTopping
+	}
+	isi, topping, err = normKomposisi(jenis, isi, topping)
+	if err != nil {
+		return 0, err
+	}
+	bobot := HitungBobot(jenis, isi, topping)
 	if in.Bobot != nil {
 		bobot = *in.Bobot
 	}
@@ -106,7 +157,7 @@ func (s Service) AddProduct(ctx context.Context, in bakery.ProductInput) (int64,
 		return 0, err
 	}
 	defer tx.Rollback()
-	id, err := s.bakery.InsertProduct(ctx, tx, in.Nama, in.Harga, in.Kategori, jenis, bobot, in.MaksVarian)
+	id, err := s.bakery.InsertProduct(ctx, tx, in.Nama, in.Harga, in.Kategori, jenis, bobot, isi, topping, in.MaksVarian)
 	if err != nil {
 		return 0, err
 	}
@@ -119,7 +170,7 @@ func (s Service) AddProduct(ctx context.Context, in bakery.ProductInput) (int64,
 // PatchProduct mengubah sebagian kolom produk (PATCH /api/products/{id}).
 func (s Service) PatchProduct(ctx context.Context, id int64, in bakery.ReqPatchProduct) error {
 	if in.Nama == nil && in.Harga == nil && in.Aktif == nil && in.Kategori == nil && in.Jenis == nil && in.Bobot == nil &&
-		in.MaksVarian == nil && in.Variants == nil {
+		in.IsiBox == nil && in.IsiTopping == nil && in.MaksVarian == nil && in.Variants == nil {
 		return fmt.Errorf("%w: tidak ada yang diubah", bakery.ErrValidation)
 	}
 	if in.Nama != nil || in.Harga != nil || in.Aktif != nil {
@@ -127,7 +178,7 @@ func (s Service) PatchProduct(ctx context.Context, id int64, in bakery.ReqPatchP
 			return err
 		}
 	}
-	if err := s.UpdateProductDetail(ctx, id, in.Kategori, in.Jenis, in.Bobot); err != nil {
+	if err := s.UpdateProductDetail(ctx, id, in); err != nil {
 		return err
 	}
 	if in.MaksVarian != nil || in.Variants != nil {
@@ -281,50 +332,65 @@ func (s Service) UpdateProduct(ctx context.Context, id int64, nama *string, harg
 	return nil
 }
 
-// UpdateProductDetail mengubah kategori, jenis, dan/atau bobot. Bila jenis
-// diganti tanpa bobot, bobot mengikuti bawaan jenis itu.
-func (s Service) UpdateProductDetail(ctx context.Context, id int64, kategori, jenis *string, bobot *float64) error {
-	if kategori == nil && jenis == nil && bobot == nil {
+// UpdateProductDetail mengubah kategori, jenis, isi box, dan/atau bobot. Bila
+// jenis atau isi box diganti tanpa bobot, bobot dihitung ulang dengan HitungBobot.
+func (s Service) UpdateProductDetail(ctx context.Context, id int64, in bakery.ReqPatchProduct) error {
+	if in.Kategori == nil && in.Jenis == nil && in.IsiBox == nil && in.IsiTopping == nil && in.Bobot == nil {
 		return nil
 	}
-	exists, err := s.bakery.CountProductByID(ctx, id)
+	jenis, isi, topping, err := s.bakery.GetProductKomposisi(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return bakery.ErrNotFound
+	}
 	if err != nil {
 		return err
 	}
-	if exists == 0 {
-		return bakery.ErrNotFound
-	}
-	if kategori != nil {
-		ok, err := s.categoryExists(ctx, *kategori)
+	if in.Kategori != nil {
+		ok, err := s.categoryExists(ctx, *in.Kategori)
 		if err != nil {
 			return err
 		}
 		if !ok {
-			return fmt.Errorf("%w: kategori %q belum ada", bakery.ErrValidation, *kategori)
+			return fmt.Errorf("%w: kategori %q belum ada", bakery.ErrValidation, *in.Kategori)
 		}
-		if err := s.bakery.UpdateProductKategori(ctx, id, *kategori); err != nil {
+		if err := s.bakery.UpdateProductKategori(ctx, id, *in.Kategori); err != nil {
 			return err
 		}
 	}
-	if jenis != nil {
-		j, err := normJenis(*jenis)
-		if err != nil {
+	if in.Jenis != nil || in.IsiBox != nil || in.IsiTopping != nil {
+		if in.Jenis != nil {
+			j, err := normJenis(*in.Jenis)
+			if err != nil {
+				return err
+			}
+			if j == "campuran" && j != jenis && in.IsiTopping == nil {
+				topping = 1
+			}
+			jenis = j
+		}
+		if in.IsiBox != nil {
+			isi = *in.IsiBox
+		}
+		if in.IsiTopping != nil {
+			topping = *in.IsiTopping
+		}
+		if isi, topping, err = normKomposisi(jenis, isi, topping); err != nil {
 			return err
 		}
-		b := jenisBobot[j]
-		if bobot != nil {
-			b = *bobot
+		b := HitungBobot(jenis, isi, topping)
+		if in.Bobot != nil {
+			b = *in.Bobot
 		}
 		if err := checkBobot(b); err != nil {
 			return err
 		}
-		return s.bakery.UpdateProductJenisBobot(ctx, id, j, b)
+		return s.bakery.UpdateProductKomposisi(ctx, id, jenis, isi, topping, b)
 	}
-	if bobot != nil {
-		if err := checkBobot(*bobot); err != nil {
+	if in.Bobot != nil {
+		if err := checkBobot(*in.Bobot); err != nil {
 			return err
 		}
-		return s.bakery.UpdateProductBobot(ctx, id, *bobot)
+		return s.bakery.UpdateProductBobot(ctx, id, *in.Bobot)
 	}
 	return nil
 }

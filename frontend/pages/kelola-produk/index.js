@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import api from '../../services/bakery';
-import { JENIS_VALUE, toUiProduct } from '../../utils/mapper';
+import { JENIS_VALUE, hitungBobot, komposisiProblem, toUiProduct } from '../../utils/mapper';
 import { useLoad } from '../../utils/useLoad';
 import ErrorBanner from '../../components/ErrorBanner';
 import VariantEditor, { toEditorVariant, toVariantPayload, variantProblem } from '../../components/produk/VariantEditor';
@@ -15,15 +15,21 @@ function ProductModal({ mode, product, cats, onClose, onSave }) {
   const [form, setForm] = useState(() => {
     const base = product
       ? { ...product }
-      : { name: '', jenis: 'Tanpa topping', price: '', active: true, kategori: cats[0] || '', maxVariants: 0, variants: [] };
+      : { name: '', jenis: 'Tanpa topping', price: '', active: true, kategori: cats[0] || '', isiBox: 3, isiTopping: 0, maxVariants: 0, variants: [] };
     return {
       ...base,
+      isiBox: String(base.isiBox),
+      isiTopping: String(base.jenis === 'Campuran' ? base.isiTopping : 1),
       isPaket: base.maxVariants > 0 || (!product && base.kategori === PAKET_KATEGORI),
       maxVariants: base.maxVariants > 0 ? String(base.maxVariants) : '',
       variants: base.variants.map(toEditorVariant),
     };
   });
   const paketProblem = form.isPaket ? variantProblem(form.maxVariants, form.variants) : '';
+  const isi = Number(form.isiBox);
+  const topping = Number(form.isiTopping);
+  const isiProblem = komposisiProblem(form.jenis, isi, topping);
+  const bobot = isiProblem ? null : hitungBobot(form.jenis, isi, topping);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
@@ -83,6 +89,34 @@ function ProductModal({ mode, product, cats, onClose, onSave }) {
               <option>Campuran</option>
             </select>
           </div>
+          <div className="flex gap-3">
+            <div className="flex flex-col gap-2 flex-1">
+              <label className="text-[#2b1d16] text-sm">Isi per box (roti)</label>
+              <input className="input-field" type="number" min="1" value={form.isiBox}
+                onChange={e => setForm(f => ({ ...f, isiBox: e.target.value }))}
+                placeholder="3" />
+            </div>
+            {form.jenis === 'Campuran' && (
+              <div className="flex flex-col gap-2 flex-1">
+                <label className="text-[#2b1d16] text-sm">Roti bertopping per box</label>
+                <input className="input-field" type="number" min="1" value={form.isiTopping}
+                  onChange={e => setForm(f => ({ ...f, isiTopping: e.target.value }))}
+                  placeholder="1" />
+              </div>
+            )}
+          </div>
+          {isiProblem
+            ? <p className="text-[#b74b40] text-xs -mt-3">{isiProblem}</p>
+            : (
+              <div className="bg-[#faf6ee] rounded-xl px-4 py-3 -mt-2">
+                <p className="text-[#2b1d16] text-sm">
+                  Bobot kapasitas: <span className="font-semibold">{bobot.toLocaleString('id-ID', { minimumFractionDigits: 2 })} ×</span>
+                </p>
+                <p className="text-[#8a7768] text-xs mt-0.5">
+                  100 box produk = {Math.ceil(100 * bobot - 1e-9)} box kapasitas
+                </p>
+              </div>
+            )}
           <div className="flex flex-col gap-2">
             <label className="text-[#2b1d16] text-sm">Harga (Rp)</label>
             <input className="input-field" type="number" value={form.price}
@@ -158,7 +192,7 @@ function ProductModal({ mode, product, cats, onClose, onSave }) {
         {/* Footer */}
         <div className="flex gap-3 px-6 py-5 border-t border-[#eadfd0]">
           <button onClick={onClose} className="btn-secondary flex-1 justify-center">Batal</button>
-          <button disabled={saving || !form.name?.trim() || form.price === '' || !!paketProblem} onClick={() => submit(form)} className="btn-primary flex-1 justify-center disabled:opacity-60">
+          <button disabled={saving || !form.name?.trim() || form.price === '' || !!paketProblem || !!isiProblem} onClick={() => submit(form)} className="btn-primary flex-1 justify-center disabled:opacity-60">
             {mode === 'add' ? 'Tambah Produk' : 'Simpan Perubahan'}
           </button>
         </div>
@@ -270,16 +304,20 @@ export default function KelolaProduk() {
       maks_varian: form.isPaket ? Number(form.maxVariants) : 0,
       variants: form.isPaket ? form.variants.map(toVariantPayload) : [],
     };
+    // bobot dihitung server dari jenis + isi box
+    const komposisi = {
+      jenis: JENIS_VALUE[form.jenis],
+      isi_box: Number(form.isiBox),
+      isi_topping: form.jenis === 'Campuran' ? Number(form.isiTopping) : undefined,
+    };
     if (form.deleted) {
       await api.deleteProduct(form.id);
     } else if (modal === 'add') {
-      await api.insertProduct({ nama: form.name.trim(), harga: Number(form.price), kategori: form.kategori, jenis: JENIS_VALUE[form.jenis], ...paket });
+      await api.insertProduct({ nama: form.name.trim(), harga: Number(form.price), kategori: form.kategori, ...komposisi, ...paket });
     } else {
-      const jenisBerubah = form.jenis !== selectedProduct.jenis; // ganti jenis = bobot ikut bawaan jenis baru
       await api.updateProduct(form.id, {
         nama: form.name.trim(), harga: Number(form.price), aktif: form.active, kategori: form.kategori,
-        jenis: jenisBerubah ? JENIS_VALUE[form.jenis] : undefined,
-        ...paket,
+        ...komposisi, ...paket,
       });
     }
     prods.reload();
@@ -310,7 +348,7 @@ export default function KelolaProduk() {
       <ErrorBanner message={err || prods.error || catsLoad.error} />
 
       {/* Weight rule cards */}
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-3 gap-5">
         <div className="card p-6 flex flex-col gap-2.5">
           <div className="flex items-start justify-between">
             <p className="text-[#2b1d16] text-lg font-semibold">Tanpa topping</p>
@@ -319,17 +357,27 @@ export default function KelolaProduk() {
             </span>
           </div>
           <p className="text-[#2b1d16] text-[28px] font-semibold">1,00 ×</p>
-          <p className="text-[#8a7768] text-sm">100 box produk = 100 box kapasitas</p>
+          <p className="text-[#8a7768] text-sm">Per box, berapa pun isinya</p>
         </div>
         <div className="card p-6 flex flex-col gap-2.5">
           <div className="flex items-start justify-between">
             <p className="text-[#2b1d16] text-lg font-semibold">Bertopping</p>
             <span className="bg-[#faf6ee] text-[#4c0c13] text-xs font-medium px-3 py-1.5 rounded-full">
-              Mengikuti Pengaturan
+              Patokan isi 3
             </span>
           </div>
-          <p className="text-[#2b1d16] text-[28px] font-semibold">1,23 ×</p>
-          <p className="text-[#8a7768] text-sm">100 box produk = 123 box kapasitas</p>
+          <p className="text-[#2b1d16] text-[28px] font-semibold">0,41 × isi</p>
+          <p className="text-[#8a7768] text-sm">Isi 3 = 1,23 · isi 2 = 0,82 · isi 4 = 1,64</p>
+        </div>
+        <div className="card p-6 flex flex-col gap-2.5">
+          <div className="flex items-start justify-between">
+            <p className="text-[#2b1d16] text-lg font-semibold">Campuran</p>
+            <span className="bg-[#faf6ee] text-[#4c0c13] text-xs font-medium px-3 py-1.5 rounded-full">
+              Dihitung per roti
+            </span>
+          </div>
+          <p className="text-[#2b1d16] text-[22px] font-semibold leading-[42px]">0,41 × topping + sisa ÷ isi</p>
+          <p className="text-[#8a7768] text-sm">Isi 3 (1 topping + 2 polos) = 1,08</p>
         </div>
       </div>
 
@@ -407,7 +455,12 @@ export default function KelolaProduk() {
               )}
             </div>
             <p className="w-[120px] text-sm text-[#2b1d16]">Rp {p.price.toLocaleString('id-ID')}</p>
-            <p className="w-[180px] text-sm text-[#78685c]">{p.jenis}</p>
+            <div className="w-[180px]">
+              <p className="text-sm text-[#78685c]">{p.jenis}</p>
+              <p className="text-xs text-[#8a7768]">
+                Isi {p.isiBox}{p.jenis === 'Campuran' ? ` (${p.isiTopping} topping)` : ''} · bobot {Number(p.bobot).toLocaleString('id-ID', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
             <div className="w-[120px]">
               <button onClick={() => handleToggle(p)} className="block">
                 <img

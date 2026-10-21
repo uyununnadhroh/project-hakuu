@@ -63,7 +63,7 @@ Frontend `hakuu-web` tidak perlu diubah. Database juga tidak berubah.
 
 ## Menjalankan (Windows PowerShell + XAMPP)
 1. Start MySQL di XAMPP. Database `bakery` sudah ada (dari `db/schema.sql`).
-   Database lama: jalankan juga `db/migrations_002_laporan.sql`, `db/migrations_003_frontend.sql`, `db/migrations_004_penanggung_jawab.sql`, `db/migrations_005_jam_kirim.sql`, `db/migrations_006_paket_varian.sql`, `db/migrations_007_konfirmasi_pengiriman.sql`, `db/migrations_008_jam_operasional.sql`, dan `db/migrations_009_pesanan_besar.sql` (berurutan; 002–004 dan 006 cukup sekali).
+   Database lama: jalankan juga `db/migrations_002_laporan.sql`, `db/migrations_003_frontend.sql`, `db/migrations_004_penanggung_jawab.sql`, `db/migrations_005_jam_kirim.sql`, `db/migrations_006_paket_varian.sql`, `db/migrations_007_konfirmasi_pengiriman.sql`, `db/migrations_008_jam_operasional.sql`, `db/migrations_009_pesanan_besar.sql`, dan `db/migrations_010_isi_box.sql` (berurutan; 002–004, 006, dan 010 cukup sekali).
    Contoh paket pilih varian (Paket Hemat isi 2/3/4): `db/seed_paket_varian.sql` (opsional).
 2. Cek `files/etc/bakery-scheduler/bakery-scheduler.development.yaml`: DSN database dan ganti `jwt.secret`
    dengan string acak minimal 32 karakter.
@@ -129,6 +129,11 @@ dipindahkan otomatis.
 | GET/POST | /api/customers | Pelanggan |
 
 Contoh order: `{"items":[{"product_id":1,"qty":30}],"deliver_at":"2026-10-20 15:00","customer":{"nama":"Bu Sari","telepon":"0812","alamat":"Jl. Mawar"}}`
+
+Bobot kapasitas produk dihitung otomatis dari `jenis`, `isi_box` (roti per box, default 3), dan `isi_topping`
+(roti bertopping, wajib untuk campuran). Patokannya box isi 3 bertopping = 1,23, jadi 1 roti bertopping = 0,41:
+tanpa topping = 1,00 per box; bertopping = 0,41 × isi; campuran = 0,41 × roti bertopping + roti tanpa topping ÷ isi.
+Contoh `{"jenis":"campuran","isi_box":4,"isi_topping":2}` → bobot 1,32. Kirim `bobot` hanya untuk mengisi manual.
 
 Paket pilih varian lewat `POST /api/products` / `PATCH /api/products/{id}`: kirim `maks_varian` (isi paket, 0 = produk biasa)
 dan `variants` (daftar lengkap, menggantikan yang lama). Contoh:

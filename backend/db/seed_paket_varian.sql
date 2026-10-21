@@ -1,8 +1,9 @@
 -- Contoh data paket pilih varian (opsional, untuk demo/pengembangan).
--- Butuh migrations_006_paket_varian.sql (atau schema.sql terbaru). Harga & varian silakan disesuaikan.
+-- Butuh migrations_006_paket_varian.sql dan migrations_010_isi_box.sql (atau schema.sql terbaru). Harga & varian silakan disesuaikan.
 -- Aman dijalankan ulang: paket/varian yang sudah ada dilewati.
-INSERT INTO products (nama, harga, kategori, jenis, bobot, maks_varian)
-SELECT n.nama, n.harga, 'Paket Pilih Varian', 'campuran', 1.10, n.maks
+-- Bobot campuran 1 roti bertopping: 0,41 x 1 + (isi - 1) / isi.
+INSERT INTO products (nama, harga, kategori, jenis, bobot, isi_box, isi_topping, maks_varian)
+SELECT n.nama, n.harga, 'Paket Pilih Varian', 'campuran', ROUND(0.41 + (n.maks - 1) / n.maks, 2), n.maks, 1, n.maks
 FROM (
   SELECT 'Paket Hemat isi 2' AS nama, 30000 AS harga, 2 AS maks
   UNION ALL SELECT 'Paket Hemat isi 3', 42000, 3

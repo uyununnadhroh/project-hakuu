@@ -89,7 +89,7 @@ type BakeryData interface {
 	ListProducts(ctx context.Context) ([]bakery.Product, error)
 	ListProductVariants(ctx context.Context) ([]bakery.ProductVariant, error)
 	CountProductByID(ctx context.Context, id int64) (int, error)
-	InsertProduct(ctx context.Context, tx *sqlx.Tx, nama string, harga float64, kategori, jenis string, bobot float64, maksVarian int) (int64, error)
+	InsertProduct(ctx context.Context, tx *sqlx.Tx, nama string, harga float64, kategori, jenis string, bobot float64, isiBox, isiTopping, maksVarian int) (int64, error)
 	GetAllVariantsLock(ctx context.Context, tx *sqlx.Tx, productID int64) ([]bakery.ProductVariant, error)
 	CountVariantUsage(ctx context.Context, tx *sqlx.Tx, variantID int64) (int, error)
 	InsertProductVariant(ctx context.Context, tx *sqlx.Tx, productID int64, v bakery.ProductVariant, urutan int) error
@@ -100,7 +100,8 @@ type BakeryData interface {
 	UpdateProductHarga(ctx context.Context, id int64, harga float64) error
 	UpdateProductAktif(ctx context.Context, id int64, aktif bool) error
 	UpdateProductKategori(ctx context.Context, id int64, kategori string) error
-	UpdateProductJenisBobot(ctx context.Context, id int64, jenis string, bobot float64) error
+	GetProductKomposisi(ctx context.Context, id int64) (string, int, int, error)
+	UpdateProductKomposisi(ctx context.Context, id int64, jenis string, isiBox, isiTopping int, bobot float64) error
 	UpdateProductBobot(ctx context.Context, id int64, bobot float64) error
 	CountProductUsage(ctx context.Context, id int64) (int, error)
 	DeleteProduct(ctx context.Context, id int64) (int64, error)

@@ -30,7 +30,9 @@ CREATE TABLE products (
   aktif    BOOLEAN NOT NULL DEFAULT TRUE,
   kategori VARCHAR(60) NOT NULL DEFAULT 'Menu Hemat',
   jenis    ENUM('tanpa_topping','bertopping','campuran') NOT NULL DEFAULT 'tanpa_topping',
-  bobot    DECIMAL(4,2) NOT NULL DEFAULT 1.00,  -- bobot kapasitas per box
+  bobot    DECIMAL(4,2) NOT NULL DEFAULT 1.00,  -- bobot kapasitas per box (dihitung dari jenis + isi box)
+  isi_box     TINYINT NOT NULL DEFAULT 3,        -- jumlah roti per box (patokan bobot: box isi 3)
+  isi_topping TINYINT NOT NULL DEFAULT 0,        -- jumlah roti bertopping di dalam box (campuran)
   maks_varian TINYINT NOT NULL DEFAULT 0       -- paket pilih varian: jumlah varian wajib dipilih (0 = bukan paket varian)
 ) ENGINE=InnoDB;
 

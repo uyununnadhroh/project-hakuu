@@ -22,7 +22,7 @@ func (d Data) ListProducts(ctx context.Context) ([]bakery.Product, error) {
 	out := []bakery.Product{}
 	for rows.Next() {
 		var p bakery.Product
-		if err := rows.Scan(&p.ID, &p.Nama, &p.Harga, &p.Aktif, &p.Kategori, &p.Jenis, &p.Bobot, &p.MaksVarian); err != nil {
+		if err := rows.Scan(&p.ID, &p.Nama, &p.Harga, &p.Aktif, &p.Kategori, &p.Jenis, &p.Bobot, &p.IsiBox, &p.IsiTopping, &p.MaksVarian); err != nil {
 			return nil, err
 		}
 		p.Variants = []bakery.ProductVariant{}
@@ -126,8 +126,8 @@ func (d Data) CountProductByID(ctx context.Context, id int64) (int, error) {
 	return n, err
 }
 
-func (d Data) InsertProduct(ctx context.Context, tx *sqlx.Tx, nama string, harga float64, kategori, jenis string, bobot float64, maksVarian int) (int64, error) {
-	r, err := d.st(ctx, tx, insProduct).ExecContext(ctx, nama, harga, kategori, jenis, bobot, maksVarian)
+func (d Data) InsertProduct(ctx context.Context, tx *sqlx.Tx, nama string, harga float64, kategori, jenis string, bobot float64, isiBox, isiTopping, maksVarian int) (int64, error) {
+	r, err := d.st(ctx, tx, insProduct).ExecContext(ctx, nama, harga, kategori, jenis, bobot, isiBox, isiTopping, maksVarian)
 	if err != nil {
 		return 0, err
 	}
@@ -154,8 +154,17 @@ func (d Data) UpdateProductKategori(ctx context.Context, id int64, kategori stri
 	return err
 }
 
-func (d Data) UpdateProductJenisBobot(ctx context.Context, id int64, jenis string, bobot float64) error {
-	_, err := (*d.stmt)[updProductJenisBobot].ExecContext(ctx, jenis, bobot, id)
+// GetProductKomposisi mengembalikan jenis, isi box, dan jumlah roti bertopping;
+// sql.ErrNoRows bila produk tidak ada.
+func (d Data) GetProductKomposisi(ctx context.Context, id int64) (string, int, int, error) {
+	var jenis string
+	var isi, topping int
+	err := (*d.stmt)[getProductKomposisi].QueryRowxContext(ctx, id).Scan(&jenis, &isi, &topping)
+	return jenis, isi, topping, err
+}
+
+func (d Data) UpdateProductKomposisi(ctx context.Context, id int64, jenis string, isiBox, isiTopping int, bobot float64) error {
+	_, err := (*d.stmt)[updProductKomposisi].ExecContext(ctx, jenis, isiBox, isiTopping, bobot, id)
 	return err
 }
 
