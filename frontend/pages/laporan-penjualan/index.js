@@ -275,10 +275,10 @@ export default function LaporanPenjualan() {
                 {aksiBusy === 'tutup' ? 'Menutup…' : 'Tutup bulan'}
               </button>
             )}
-            <button onClick={handleUnduhCsv} disabled={!!aksiBusy}
+            {/* <button onClick={handleUnduhCsv} disabled={!!aksiBusy}
               className="btn-secondary text-[#4c0c13] disabled:opacity-50">
               {aksiBusy === 'csv' ? 'Mengunduh…' : 'Unduh CSV'}
-            </button>
+            </button> */}
             <button onClick={handleCetak} disabled={loading || !data}
               className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
               <IconPrinter /> Cetak laporan
