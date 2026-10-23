@@ -2,6 +2,7 @@ import { useState } from 'react';
 import api from '../../services/bakery';
 import { useLoad } from '../../utils/useLoad';
 import ErrorBanner from '../../components/ErrorBanner';
+import ScoreBadge from '../../components/ScoreBadge';
 import { fmtTgl, ymd } from '../../utils/orderStatus';
 import { penanggungJawab } from '../../utils/mapper';
 
@@ -13,15 +14,6 @@ function IconPrinter() {
       <rect x="6" y="14" width="12" height="8" />
     </svg>
   );
-}
-
-function ScoreBadge({ score }) {
-  if (score == null) return <span className="text-[#8a7768] text-xs">—</span>;
-  const s = Math.round(score * 100);
-  const color = s >= 85 ? 'bg-[#eaf5ed] text-[#327a52]'
-              : s >= 70 ? 'bg-[#fdf6ec] text-[#a66a17]'
-              :           'bg-[#fef2f2] text-[#b74b40]';
-  return <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium ${color}`}>{s}</span>;
 }
 
 function SesiTable({ title, subtitle, rows }) {

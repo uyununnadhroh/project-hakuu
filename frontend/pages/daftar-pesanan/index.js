@@ -5,6 +5,7 @@ import api from '../../services/bakery';
 import { toUiOrder, penanggungJawab } from '../../utils/mapper';
 import { useLoad } from '../../utils/useLoad';
 import ErrorBanner from '../../components/ErrorBanner';
+import ScoreBadge from '../../components/ScoreBadge';
 import { badgeMap, fmtTgl, hLabel, statusText, ymd } from '../../utils/orderStatus';
 
 const STATUS_TABS = ['Semua', 'Diterima', 'Dijadwalkan', 'Diproduksi', 'Selesai', 'Dibatalkan'];
@@ -100,6 +101,50 @@ function RekapCetak({ tanggal, details }) {
   );
 }
 
+const KRITERIA = [
+  { key: 'J', label: 'Urgensi jam kirim (J)' },
+  { key: 'Q', label: 'Jumlah pesanan (Q)' },
+  { key: 'W', label: 'Waktu pesanan masuk (W)' },
+];
+// Status yang skornya dihitung ulang tiap jam (sama dengan GetOrdersForRescore di backend).
+const STATUS_DISKOR = ['baru', 'terjadwal', 'menunggu_negosiasi', 'at_risk'];
+const fmtBobot = (n) => Number(n).toLocaleString('id-ID', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+
+/** Skor prioritas AHP: total + rincian J/Q/W (skala 0–100) beserta bobotnya. */
+function SkorPrioritas({ d }) {
+  // bobot dari pengaturan; bila gagal dimuat, rincian tetap tampil tanpa bobot
+  const { data: settings } = useLoad(() => api.getSettings(), []);
+  const w = settings?.weights;
+  const parts = d.score_parts;
+  const dihitung = d.score != null && parts && STATUS_DISKOR.includes(d.status);
+
+  return (
+    <div className="bg-[#faf6ee] border border-[#eadfd0] rounded-xl px-4 py-3 flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <p className="text-[#2b1d16] text-sm font-semibold">Skor prioritas</p>
+        {dihitung && <ScoreBadge score={d.score} />}
+      </div>
+      {dihitung ? (
+        <>
+          <div className="flex flex-col gap-1">
+            {KRITERIA.map((k) => (
+              <p key={k.key} className="text-xs text-[#7e4722]">
+                {k.label} <span className="font-semibold text-[#2b1d16]">{Math.round((parts[k.key] ?? 0) * 100)}</span>
+                {w?.[k.key] != null && <span className="text-[#8a7768]"> · bobot {fmtBobot(w[k.key])}</span>}
+              </p>
+            ))}
+          </div>
+          <p className="text-[#8a7768] text-xs">
+            Skor dihitung ulang otomatis setiap jam; makin tinggi skor, makin didahulukan pada hari produksinya.
+          </p>
+        </>
+      ) : (
+        <p className="text-[#8a7768] text-xs">Skor tidak dihitung untuk status ini</p>
+      )}
+    </div>
+  );
+}
+
 function DetailModal({ order, onClose, onChanged }) {
   const { data: d, error, loading, reload } = useLoad(() => api.getOrder(order.dbId), [order.dbId]);
   const pj = d ? penanggungJawab(d) : null;
@@ -157,6 +202,8 @@ function DetailModal({ order, onClose, onChanged }) {
                 </div>
                 {d.note && <div className="col-span-2"><p className="text-[#8a7768] text-xs">Catatan</p><p className="text-[#2b1d16]">{d.note}</p></div>}
               </div>
+
+              <SkorPrioritas d={d} />
 
               <div className="border border-[#eadfd0] rounded-xl overflow-hidden shrink-0">
                 <div className="bg-[#faf6ee] flex px-4 h-9 items-center text-xs font-medium text-[#7e4722]">
