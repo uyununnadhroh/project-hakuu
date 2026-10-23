@@ -112,6 +112,25 @@ func TestScenarioShiftLowerPriority(t *testing.T) {
 	}
 }
 
+// Kasus uji pengguna: A (kirim >= 11.00) sudah mengisi H-1, lalu masuk B
+// (kirim < 11.00) yang wajib diproduksi H-1. Skor keduanya mirip (selisih
+// < 0,05), tapi A tetap digeser ke hari H karena masih tepat waktu di sana.
+func TestScenarioShiftToOwnDayH(t *testing.T) {
+	e := setup(t, 400, 0)
+	a := e.order(t, 300, at(13, 13, 0)) // kirim Selasa 13.00 -> H-1 Senin masih muat
+	if a.ProductionDay != "2026-10-12" {
+		t.Fatalf("A harusnya diproduksi Senin: %+v", a)
+	}
+	*e.now = at(12, 8, 30)
+	b := e.order(t, 200, at(13, 10, 0)) // kirim Selasa 10.00 -> wajib Senin
+	if b.Outcome != bakery.OutcomeAccepted || b.ProductionDay != "2026-10-12" {
+		t.Fatalf("B harusnya diterima di Senin: %+v", b)
+	}
+	if len(b.Moved) != 1 || b.Moved[0].OrderID != a.OrderID || b.Moved[0].To != "2026-10-13" {
+		t.Fatalf("A harusnya digeser ke Selasa (hari H-nya): %+v", b.Moved)
+	}
+}
+
 // Kapasitas penuh, tidak ada yang bisa digeser, lembur tidak cukup -> sistem
 // merekomendasikan jam kirim lebih lambat di hari yang sama.
 func TestScenarioNegotiation(t *testing.T) {
@@ -173,13 +192,13 @@ func TestRejectWhenNothingFits(t *testing.T) {
 	*e.now = at(12, 9, 0)
 	e.order(t, 400, at(13, 14, 0))
 	e.order(t, 400, at(13, 14, 0)) // memenuhi Senin dan Selasa
-	r := e.order(t, 500, at(13, 14, 0))
+	r := e.order(t, 400, at(13, 14, 0)) // 400 = bukan pesanan besar, jadi tidak ditanya stok bahan
 	if r.Outcome != bakery.OutcomeRejected {
 		t.Fatalf("harusnya ditolak: %+v", r)
 	}
 	var n int
-	e.db.QueryRow(`SELECT COUNT(*) FROM orders WHERE jumlah=500`).Scan(&n)
-	if n != 0 {
+	e.db.QueryRow(`SELECT COUNT(*) FROM orders`).Scan(&n)
+	if n != 2 {
 		t.Errorf("order yang ditolak tidak boleh tersimpan")
 	}
 }

@@ -370,7 +370,7 @@ func (s Service) resolveConflict(ctx context.Context, tx *sqlx.Tx, newScore floa
 		}
 		var cands []bakery.Candidate
 		if !st.Locked { // hari yang dikunci (frozen window) tidak boleh diacak
-			if cands, err = s.loadCandidates(ctx, tx, day, newScore, set, now); err != nil {
+			if cands, err = s.loadCandidates(ctx, tx, day, newScore, deadline, set, now); err != nil {
 				return nil, err
 			}
 		}
@@ -405,8 +405,15 @@ func (s Service) resolveConflict(ctx context.Context, tx *sqlx.Tx, newScore floa
 	return nil, nil
 }
 
+// loadCandidates order di hari itu yang boleh digeser demi order baru:
+//   - skornya lebih rendah minimal MinScoreGap (ambang anti-reshuffle), atau
+//   - hari produksi terakhirnya lebih lambat dari order baru. Order berjam kirim
+//     >= 11.00 masih bisa diproduksi di hari H-nya, sedangkan order baru tidak
+//     punya hari cadangan, jadi H-1 didahulukan untuk order baru berapa pun skornya.
+//
+// Urutan: order yang punya hari cadangan dulu, lalu skor terendah.
 func (s Service) loadCandidates(ctx context.Context, tx *sqlx.Tx, day time.Time, newScore float64,
-	set bakery.Settings, now time.Time) ([]bakery.Candidate, error) {
+	newDeadline time.Time, set bakery.Settings, now time.Time) ([]bakery.Candidate, error) {
 
 	all, err := s.bakery.GetCandidates(ctx, tx, fmtDay(day))
 	if err != nil {
@@ -418,11 +425,17 @@ func (s Service) loadCandidates(ctx context.Context, tx *sqlx.Tx, day time.Time,
 			return nil, err
 		}
 		c.Score = ComputeScore(bakery.ScoreInput{Qty: c.Qty, DeliverAt: c.DeliverAt, OrderedAt: c.Ordered}, now, set).Total
-		if c.Score <= newScore-set.MinScoreGap { // ambang anti-reshuffle
+		if c.Score <= newScore-set.MinScoreGap || c.Deadline.After(newDeadline) {
 			out = append(out, c)
 		}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Score < out[j].Score })
+	sort.SliceStable(out, func(i, j int) bool {
+		fi, fj := out[i].Deadline.After(newDeadline), out[j].Deadline.After(newDeadline)
+		if fi != fj {
+			return fi
+		}
+		return out[i].Score < out[j].Score
+	})
 	return out, nil
 }
 
