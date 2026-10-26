@@ -31,6 +31,7 @@ var settingRules = map[string]settingRule{
 	"jam_produksi_mulai":             {0, 23, true},
 	"jam_produksi_selesai":           {0, 23, true},
 	"jam_kirim_terakhir":             {0, 23, true},
+	"jam_kunci_rencana":              {0, 23, true},
 	"batas_pesanan_besar":            {0, 100000, true},
 	"min_hari_pesanan_besar":         {0, 60, true},
 	"jam_peringatan_sebelum_selesai": {0, 12, true},

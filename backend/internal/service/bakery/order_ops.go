@@ -86,7 +86,7 @@ func (s Service) Transition(ctx context.Context, orderID int64, action, actor st
 }
 
 // RunHourly: lepas tahanan kedaluwarsa, hitung ulang skor, tandai terlambat,
-// kunci jadwal hari berikutnya (frozen window) setelah jam produksi selesai.
+// kunci jadwal hari ini (frozen window) mulai jam kunci rencana (08.00).
 func (s Service) RunHourly(ctx context.Context) error {
 	now := s.now()
 	tx, err := s.bakery.BeginTx(ctx)
@@ -148,9 +148,8 @@ func (s Service) RunHourly(ctx context.Context) error {
 	}
 
 	// 4. frozen window
-	if now.Hour() >= set.ProductionEndHour {
-		tomorrow := AddDays(DayOf(now), 1)
-		if err := s.bakery.LockDaysUntil(ctx, tx, fmtDay(tomorrow)); err != nil {
+	if DayLocked(now, now, set) {
+		if err := s.bakery.LockDaysUntil(ctx, tx, fmtDay(DayOf(now))); err != nil {
 			return err
 		}
 	}

@@ -99,6 +99,8 @@ func (s Service) loadSettings(ctx context.Context, tx *sqlx.Tx) (bakery.Settings
 			set.ProductionStartHour = int(f)
 		case "jam_produksi_selesai":
 			set.ProductionEndHour = int(f)
+		case "jam_kunci_rencana":
+			set.PlanLockHour = int(f)
 		case "jam_kirim_terakhir":
 			set.LastDeliveryHour = int(f)
 		case "batas_pesanan_besar":
@@ -134,6 +136,7 @@ func (s Service) getDay(ctx context.Context, tx *sqlx.Tx, day time.Time, set bak
 	if err != nil {
 		return st, err
 	}
+	st.Locked = st.Locked || DayLocked(day, now, set)
 	st.Used, err = s.bakery.SumUsed(ctx, tx, ds, now)
 	return st, err
 }

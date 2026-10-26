@@ -187,3 +187,22 @@ func TestIsRushBigOrder(t *testing.T) {
 		t.Error("batas 0 = aturan nonaktif")
 	}
 }
+
+func TestDayLocked(t *testing.T) {
+	s := DefaultSettings()
+	loc := time.FixedZone("WIB", 7*3600)
+	day := time.Date(2026, 10, 24, 0, 0, 0, 0, loc)
+	for _, tc := range []struct {
+		now  time.Time
+		want bool
+	}{
+		{time.Date(2026, 10, 23, 19, 0, 0, 0, loc), false},
+		{time.Date(2026, 10, 24, 7, 59, 0, 0, loc), false},
+		{time.Date(2026, 10, 24, 8, 0, 0, 0, loc), true},
+		{time.Date(2026, 10, 25, 6, 0, 0, 0, loc), true},
+	} {
+		if got := DayLocked(day, tc.now, s); got != tc.want {
+			t.Errorf("DayLocked(%v) = %v, mau %v", tc.now, got, tc.want)
+		}
+	}
+}

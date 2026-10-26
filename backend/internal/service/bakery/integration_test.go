@@ -85,6 +85,7 @@ func (e *env) used(t *testing.T, day string) int {
 // diproduksi sehingga tidak boleh digeser.
 func TestScenarioShiftLowerPriority(t *testing.T) {
 	e := setup(t, 400, 40)
+	*e.now = at(12, 7, 0) // rencana Senin baru dikunci 08.00
 	a := e.order(t, 250, at(13, 7, 0))  // kirim Selasa 07.00 -> produksi Senin
 	b := e.order(t, 200, at(13, 15, 0)) // kirim Selasa 15.00 -> Senin penuh -> Selasa
 	c := e.order(t, 150, at(13, 15, 0)) // kirim Selasa 15.00 -> H-1 Senin masih sisa 150
@@ -94,7 +95,7 @@ func TestScenarioShiftLowerPriority(t *testing.T) {
 	if err := e.svc.Transition(context.Background(), a.OrderID, "start", "penjual"); err != nil {
 		t.Fatal(err)
 	}
-	*e.now = at(12, 9, 0)
+	*e.now = at(12, 7, 30)
 	g := e.order(t, 150, at(13, 8, 0)) // mendadak, harus Senin
 	if g.Outcome != bakery.OutcomeAccepted || g.ProductionDay != "2026-10-12" {
 		t.Fatalf("G harusnya diterima di Senin: %+v", g)
@@ -117,11 +118,12 @@ func TestScenarioShiftLowerPriority(t *testing.T) {
 // < 0,05), tapi A tetap digeser ke hari H karena masih tepat waktu di sana.
 func TestScenarioShiftToOwnDayH(t *testing.T) {
 	e := setup(t, 400, 0)
+	*e.now = at(12, 7, 0)
 	a := e.order(t, 300, at(13, 13, 0)) // kirim Selasa 13.00 -> H-1 Senin masih muat
 	if a.ProductionDay != "2026-10-12" {
 		t.Fatalf("A harusnya diproduksi Senin: %+v", a)
 	}
-	*e.now = at(12, 8, 30)
+	*e.now = at(12, 7, 30)
 	b := e.order(t, 200, at(13, 10, 0)) // kirim Selasa 10.00 -> wajib Senin
 	if b.Outcome != bakery.OutcomeAccepted || b.ProductionDay != "2026-10-12" {
 		t.Fatalf("B harusnya diterima di Senin: %+v", b)
@@ -131,33 +133,46 @@ func TestScenarioShiftToOwnDayH(t *testing.T) {
 	}
 }
 
-// Sama seperti di atas, tapi B masuk setelah 18.00 sehingga hari produksi
-// besok (H-1 B) sudah dikunci job per jam. A tetap boleh keluar ke hari H-nya,
-// sedangkan order yang hanya kalah skor (tanpa hari cadangan) tidak diacak.
-func TestScenarioShiftFromLockedDay(t *testing.T) {
-	e := setup(t, 400, 0)
-	*e.now = at(23, 9, 0)
-	x := e.order(t, 200, at(25, 8, 0))  // kirim Minggu 08.00 -> wajib Sabtu
-	a := e.order(t, 100, at(25, 16, 0)) // kirim Minggu 16.00 -> Sabtu masih muat
-	if x.ProductionDay != "2026-10-24" || a.ProductionDay != "2026-10-24" {
-		t.Fatalf("reservasi awal salah: X=%s A=%s", x.ProductionDay, a.ProductionDay)
-	}
-	*e.now = at(23, 19, 0)
-	if err := e.svc.RunHourly(context.Background()); err != nil { // mengunci Sabtu
-		t.Fatal(err)
-	}
-	b := e.order(t, 120, at(25, 10, 0)) // kirim Minggu 10.00 -> wajib Sabtu
-	if b.Outcome != bakery.OutcomeAccepted || b.ProductionDay != "2026-10-24" {
-		t.Fatalf("B harusnya diterima di Sabtu: %+v", b)
-	}
-	if len(b.Moved) != 1 || b.Moved[0].OrderID != a.OrderID || b.Moved[0].To != "2026-10-25" {
-		t.Fatalf("hanya A yang harusnya digeser ke Minggu: %+v", b.Moved)
-	}
-	// Sabtu terisi 200 + 120 = 320; order wajib Sabtu berikutnya tidak boleh
-	// menggeser X/B (tidak punya hari cadangan) meski skornya lebih tinggi.
-	c := e.order(t, 150, at(25, 7, 0))
-	if c.Outcome == bakery.OutcomeAccepted {
-		t.Fatalf("C tidak boleh mengacak hari yang dikunci: %+v", c)
+// Rencana produksi suatu hari masih boleh diubah sampai 08.00 di hari itu.
+// A (kirim Minggu 16.00) mengisi Sabtu; B (kirim Minggu 10.00, wajib Sabtu)
+// yang masuk Sabtu 07.30 masih bisa menggeser A ke Minggu, tetapi setelah
+// 08.00 Sabtu sudah dikunci sehingga B hanya ditawari jam kirim lain.
+func TestScenarioPlanLock(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		now   time.Time
+		shift bool
+	}{
+		{"malam sebelumnya", at(23, 19, 0), true},
+		{"sebelum 08.00", at(24, 7, 30), true},
+		{"setelah 08.00", at(24, 8, 0), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := setup(t, 400, 0)
+			*e.now = at(23, 9, 0)
+			x := e.order(t, 200, at(25, 8, 0))  // kirim Minggu 08.00 -> wajib Sabtu
+			a := e.order(t, 100, at(25, 16, 0)) // kirim Minggu 16.00 -> Sabtu masih muat
+			if x.ProductionDay != "2026-10-24" || a.ProductionDay != "2026-10-24" {
+				t.Fatalf("reservasi awal salah: X=%s A=%s", x.ProductionDay, a.ProductionDay)
+			}
+			*e.now = tc.now
+			if err := e.svc.RunHourly(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			b := e.order(t, 120, at(25, 10, 0))
+			if !tc.shift {
+				if b.Outcome != bakery.OutcomeNegotiation || len(b.Moved) != 0 {
+					t.Fatalf("Sabtu sudah dikunci, B harusnya negosiasi tanpa menggeser: %+v", b)
+				}
+				return
+			}
+			if b.Outcome != bakery.OutcomeAccepted || b.ProductionDay != "2026-10-24" {
+				t.Fatalf("B harusnya diterima di Sabtu: %+v", b)
+			}
+			if len(b.Moved) != 1 || b.Moved[0].OrderID != a.OrderID || b.Moved[0].To != "2026-10-25" {
+				t.Fatalf("A harusnya digeser ke Minggu: %+v", b.Moved)
+			}
+		})
 	}
 }
 

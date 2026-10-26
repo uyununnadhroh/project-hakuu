@@ -17,7 +17,7 @@ func DefaultSettings() bakery.Settings {
 		CapacityPerDay: 800, OvertimeMax: 80, WindowHours: 72,
 		MorningCutoffHour: 11, MaxWaitHours: 96, RoundHours: 1,
 		MinScoreGap: 0.05, MaxOffers: 3, HoldMinutes: 60,
-		ProductionStartHour: 6, ProductionEndHour: 18,
+		ProductionStartHour: 6, ProductionEndHour: 18, PlanLockHour: 8,
 		LastDeliveryHour: 20, WarnHours: 2,
 		BigOrderQty: 400, BigOrderLeadDays: 7,
 		Weights: bakery.Weights{J: 0.648, Q: 0.230, W: 0.122},
@@ -69,6 +69,13 @@ func EarliestDay(deliverAt, now time.Time, s bakery.Settings) time.Time {
 		e = today
 	}
 	return e
+}
+
+// DayLocked rencana produksi hari itu sudah dikunci (frozen window): sejak jam
+// PlanLockHour (default 08.00) di hari produksi itu sendiri. Sebelumnya order
+// di hari itu masih boleh digeser.
+func DayLocked(day, now time.Time, s bakery.Settings) bool {
+	return !now.Before(DayOf(day).Add(time.Duration(s.PlanLockHour) * time.Hour))
 }
 
 func InWindow(deliverAt, now time.Time, s bakery.Settings) bool {

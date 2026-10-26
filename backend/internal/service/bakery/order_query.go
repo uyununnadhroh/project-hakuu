@@ -82,7 +82,7 @@ func (s Service) Schedule(ctx context.Context, fromStr string, days int) ([]bake
 		v := bakery.DayView{Date: ds, Capacity: set.CapacityPerDay}
 		capacity, locked, err := s.bakery.GetDayCapacity(ctx, ds)
 		if err == nil {
-			v.Capacity, v.Locked = capacity, locked
+			v.Capacity, v.Locked = capacity, locked || DayLocked(d, now, set)
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}

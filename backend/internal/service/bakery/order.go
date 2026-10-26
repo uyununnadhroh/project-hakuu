@@ -368,9 +368,11 @@ func (s Service) resolveConflict(ctx context.Context, tx *sqlx.Tx, newScore floa
 		if err != nil {
 			return nil, err
 		}
-		cands, err := s.loadCandidates(ctx, tx, day, newScore, deadline, st.Locked, set, now)
-		if err != nil {
-			return nil, err
+		var cands []bakery.Candidate
+		if !st.Locked { // hari yang dikunci (frozen window, mulai 08.00 hari itu) tidak boleh diacak
+			if cands, err = s.loadCandidates(ctx, tx, day, newScore, deadline, set, now); err != nil {
+				return nil, err
+			}
 		}
 		delta := map[string]int{}
 		free := st.Base - st.Used // bisa negatif bila sudah ada lembur
@@ -409,13 +411,9 @@ func (s Service) resolveConflict(ctx context.Context, tx *sqlx.Tx, newScore floa
 //     >= 11.00 masih bisa diproduksi di hari H-nya, sedangkan order baru tidak
 //     punya hari cadangan, jadi H-1 didahulukan untuk order baru berapa pun skornya.
 //
-// Hari yang dikunci (frozen window, sejak 18.00 sehari sebelumnya) tidak diacak
-// berdasarkan skor; yang boleh keluar hanya order yang masih punya hari cadangan,
-// supaya order baru yang wajib H-1 tetap bisa masuk.
-//
 // Urutan: order yang punya hari cadangan dulu, lalu skor terendah.
 func (s Service) loadCandidates(ctx context.Context, tx *sqlx.Tx, day time.Time, newScore float64,
-	newDeadline time.Time, locked bool, set bakery.Settings, now time.Time) ([]bakery.Candidate, error) {
+	newDeadline time.Time, set bakery.Settings, now time.Time) ([]bakery.Candidate, error) {
 
 	all, err := s.bakery.GetCandidates(ctx, tx, fmtDay(day))
 	if err != nil {
@@ -427,8 +425,7 @@ func (s Service) loadCandidates(ctx context.Context, tx *sqlx.Tx, day time.Time,
 			return nil, err
 		}
 		c.Score = ComputeScore(bakery.ScoreInput{Qty: c.Qty, DeliverAt: c.DeliverAt, OrderedAt: c.Ordered}, now, set).Total
-		spare := c.Deadline.After(newDeadline)
-		if spare || (!locked && c.Score <= newScore-set.MinScoreGap) {
+		if c.Score <= newScore-set.MinScoreGap || c.Deadline.After(newDeadline) {
 			out = append(out, c)
 		}
 	}
