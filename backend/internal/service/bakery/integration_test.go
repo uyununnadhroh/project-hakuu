@@ -131,6 +131,36 @@ func TestScenarioShiftToOwnDayH(t *testing.T) {
 	}
 }
 
+// Sama seperti di atas, tapi B masuk setelah 18.00 sehingga hari produksi
+// besok (H-1 B) sudah dikunci job per jam. A tetap boleh keluar ke hari H-nya,
+// sedangkan order yang hanya kalah skor (tanpa hari cadangan) tidak diacak.
+func TestScenarioShiftFromLockedDay(t *testing.T) {
+	e := setup(t, 400, 0)
+	*e.now = at(23, 9, 0)
+	x := e.order(t, 200, at(25, 8, 0))  // kirim Minggu 08.00 -> wajib Sabtu
+	a := e.order(t, 100, at(25, 16, 0)) // kirim Minggu 16.00 -> Sabtu masih muat
+	if x.ProductionDay != "2026-10-24" || a.ProductionDay != "2026-10-24" {
+		t.Fatalf("reservasi awal salah: X=%s A=%s", x.ProductionDay, a.ProductionDay)
+	}
+	*e.now = at(23, 19, 0)
+	if err := e.svc.RunHourly(context.Background()); err != nil { // mengunci Sabtu
+		t.Fatal(err)
+	}
+	b := e.order(t, 120, at(25, 10, 0)) // kirim Minggu 10.00 -> wajib Sabtu
+	if b.Outcome != bakery.OutcomeAccepted || b.ProductionDay != "2026-10-24" {
+		t.Fatalf("B harusnya diterima di Sabtu: %+v", b)
+	}
+	if len(b.Moved) != 1 || b.Moved[0].OrderID != a.OrderID || b.Moved[0].To != "2026-10-25" {
+		t.Fatalf("hanya A yang harusnya digeser ke Minggu: %+v", b.Moved)
+	}
+	// Sabtu terisi 200 + 120 = 320; order wajib Sabtu berikutnya tidak boleh
+	// menggeser X/B (tidak punya hari cadangan) meski skornya lebih tinggi.
+	c := e.order(t, 150, at(25, 7, 0))
+	if c.Outcome == bakery.OutcomeAccepted {
+		t.Fatalf("C tidak boleh mengacak hari yang dikunci: %+v", c)
+	}
+}
+
 // Kapasitas penuh, tidak ada yang bisa digeser, lembur tidak cukup -> sistem
 // merekomendasikan jam kirim lebih lambat di hari yang sama.
 func TestScenarioNegotiation(t *testing.T) {
