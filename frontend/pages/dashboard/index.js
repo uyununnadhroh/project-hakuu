@@ -5,6 +5,7 @@ import api from '../../services/bakery';
 import { toUiOrder } from '../../utils/mapper';
 import { useLoad } from '../../utils/useLoad';
 import ErrorBanner from '../../components/ErrorBanner';
+import DetailModal from '../../components/pesanan/DetailModal';
 import { badgeMap, fmtTgl, isoDate, statusText, ymd } from '../../utils/orderStatus';
 
 // Warna bar mengikuti legenda: <70% hijau, 70–90% kuning, >90% merah.
@@ -38,6 +39,7 @@ export default function Dashboard() {
   const router = useRouter();
   const today = ymd();
   const [weekOffset, setWeekOffset] = useState(0);
+  const [detail, setDetail] = useState(null);
   const from = isoDate(weekOffset * 7);
   const to = isoDate(weekOffset * 7 + 6);
 
@@ -182,8 +184,8 @@ export default function Dashboard() {
                   </td>
                   <td className="px-6 py-4"><span className={badgeMap[o.statusOtomatis] ?? badgeMap['Diterima']}>{statusText(o)}</span></td>
                   <td className="px-6 py-4">
-                    <button onClick={() => router.push('/daftar-pesanan')} className="text-[#8a7768] hover:text-[#2b1d16]">
-                      <img src={iconEllipsis} alt="Buka daftar pesanan" className="size-4" />
+                    <button onClick={() => setDetail(o)} className="text-[#8a7768] hover:text-[#2b1d16]">
+                      <img src={iconEllipsis} alt="Lihat detail pesanan" className="size-4" />
                     </button>
                   </td>
                 </tr>
@@ -192,6 +194,8 @@ export default function Dashboard() {
           </table>
         </div>
       </div>
+
+      {detail && <DetailModal order={detail} onClose={() => setDetail(null)} onChanged={orders.reload} />}
 
       <footer className="border-t border-[#eadfd0] bg-white px-9 py-3 flex items-center justify-between">
         <p className="text-[#8a7768] text-xs">Hakuu Bakery · Operasional usaha, bukan etalase pelanggan</p>
