@@ -191,7 +191,7 @@ func TestRejectWhenNothingFits(t *testing.T) {
 	e := setup(t, 400, 40)
 	*e.now = at(12, 9, 0)
 	e.order(t, 400, at(13, 14, 0))
-	e.order(t, 400, at(13, 14, 0)) // memenuhi Senin dan Selasa
+	e.order(t, 400, at(13, 14, 0))      // memenuhi Senin dan Selasa
 	r := e.order(t, 400, at(13, 14, 0)) // 400 = bukan pesanan besar, jadi tidak ditanya stok bahan
 	if r.Outcome != bakery.OutcomeRejected {
 		t.Fatalf("harusnya ditolak: %+v", r)
@@ -281,31 +281,59 @@ func TestScenarioRushBigOrder(t *testing.T) {
 	}
 }
 
-// X (400 pcs) mengisi Senin, Y (300 pcs) terpaksa Selasa. Setelah X dibatalkan,
-// job per jam harus memajukan Y ke Senin.
-func TestRebalancePullsForward(t *testing.T) {
+// Job per jam menggeser order berjam kirim >= 11.00 dari H-1 ke hari H tanpa
+// menunggu H-1 penuh, termasuk order Baru yang belum masuk jendela 72 jam.
+// Order yang wajib H-1 dan order yang hari H-nya tidak muat tetap di tempat.
+func TestRebalanceShiftsToDayH(t *testing.T) {
 	e := setup(t, 400, 40)
 	*e.now = at(12, 7, 0)
 	ctx := context.Background()
-	x := e.order(t, 400, at(13, 15, 0))
-	y := e.order(t, 300, at(13, 15, 0))
-	if x.ProductionDay != "2026-10-12" || y.ProductionDay != "2026-10-13" {
-		t.Fatalf("awal: X=%s Y=%s", x.ProductionDay, y.ProductionDay)
+	a := e.order(t, 100, at(14, 15, 0))      // Terjadwal, produksi Selasa
+	far := e.order(t, 100, at(18, 15, 0))    // Baru (di luar jendela), produksi Sabtu
+	morning := e.order(t, 100, at(14, 9, 0)) // wajib H-1 (Selasa)
+	c := e.order(t, 100, at(16, 15, 0))      // produksi Kamis
+	filler := e.order(t, 350, at(16, 15, 0)) // Kamis tinggal 300, masuk Jumat
+	for _, r := range []*bakery.Result{a, far, morning, c, filler} {
+		if r.Outcome != bakery.OutcomeAccepted {
+			t.Fatalf("order harus diterima: %+v", r)
+		}
 	}
-	if err := e.svc.Transition(ctx, x.OrderID, "cancel", "penjual"); err != nil {
-		t.Fatal(err)
+	if a.ProductionDay != "2026-10-13" || far.ProductionDay != "2026-10-17" || c.ProductionDay != "2026-10-15" ||
+		filler.ProductionDay != "2026-10-16" {
+		t.Fatalf("awal: a=%s far=%s c=%s filler=%s", a.ProductionDay, far.ProductionDay, c.ProductionDay, filler.ProductionDay)
 	}
-	if err := e.svc.RunHourly(ctx); err != nil {
-		t.Fatal(err)
+
+	*e.now = at(12, 8, 0)
+	for i := 0; i < 2; i++ { // jalan dua kali: tidak boleh bolak-balik
+		if err := e.svc.RunHourly(ctx); err != nil {
+			t.Fatal(err)
+		}
 	}
-	d, err := e.svc.GetOrder(ctx, y.OrderID)
-	if err != nil || d.ProductionDay == nil || *d.ProductionDay != "2026-10-12" {
-		t.Fatalf("Y harusnya dimajukan ke Senin: %+v err=%v", d, err)
+	for _, w := range []struct {
+		name string
+		id   int64
+		day  string
+	}{
+		{"a", a.OrderID, "2026-10-14"}, {"far", far.OrderID, "2026-10-18"},
+		{"morning", morning.OrderID, "2026-10-13"}, {"c", c.OrderID, "2026-10-15"},
+	} {
+		d, err := e.svc.GetOrder(ctx, w.id)
+		if err != nil || d.ProductionDay == nil || *d.ProductionDay != w.day {
+			t.Errorf("%s harusnya produksi %s: %+v err=%v", w.name, w.day, d, err)
+		}
 	}
-	var n int
-	e.db.QueryRow(`SELECT COUNT(*) FROM audit_log WHERE order_id=? AND aksi='dimajukan'`, y.OrderID).Scan(&n)
-	if n != 1 {
-		t.Errorf("audit 'dimajukan' tidak tercatat")
+	if e.used(t, "2026-10-14") != 100 || e.used(t, "2026-10-13") != 100 {
+		t.Errorf("reservasi tidak ikut pindah: Selasa=%d Rabu=%d", e.used(t, "2026-10-13"), e.used(t, "2026-10-14"))
+	}
+	if d, _ := e.svc.GetOrder(ctx, far.OrderID); d.Status != "baru" {
+		t.Errorf("far harus tetap Baru: %s", d.Status)
+	}
+
+	var notif, audit int
+	e.db.QueryRow(`SELECT COUNT(*) FROM notifications WHERE order_id=? AND pesan LIKE '%digeser%'`, a.OrderID).Scan(&notif)
+	e.db.QueryRow(`SELECT COUNT(*) FROM audit_log WHERE order_id=? AND aksi IN ('digeser','dimajukan')`, a.OrderID).Scan(&audit)
+	if notif != 1 || audit != 0 {
+		t.Errorf("harus tepat satu notifikasi tanpa audit: notif=%d audit=%d", notif, audit)
 	}
 }
 
@@ -433,7 +461,7 @@ func TestBaruBecomesTerjadwalInWindow(t *testing.T) {
 	e := setup(t, 400, 40)
 	ctx := context.Background()
 	*e.now = at(12, 8, 0)
-	far := e.order(t, 100, at(18, 15, 0)) // Minggu 18 Okt: di luar jendela 72 jam
+	far := e.order(t, 100, at(18, 10, 0)) // Minggu 18 Okt 10.00 (wajib H-1): di luar jendela 72 jam
 	d, _ := e.svc.GetOrder(ctx, far.OrderID)
 	if d.Status != "baru" || d.StatusLabel != "Baru" || d.ProductionDay == nil {
 		t.Fatalf("order jauh hari harus Baru dan tetap memegang reservasi: %+v", d)
@@ -445,7 +473,7 @@ func TestBaruBecomesTerjadwalInWindow(t *testing.T) {
 	if d, _ = e.svc.GetOrder(ctx, far.OrderID); d.Status != "baru" {
 		t.Errorf("belum masuk jendela, harusnya masih Baru: %s", d.Status)
 	}
-	*e.now = at(15, 20, 0) // 67 jam sebelum kirim
+	*e.now = at(15, 20, 0) // 62 jam sebelum kirim
 	if err := e.svc.RunHourly(ctx); err != nil {
 		t.Fatal(err)
 	}

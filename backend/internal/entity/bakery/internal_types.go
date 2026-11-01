@@ -77,7 +77,7 @@ type ScoreRow struct {
 	Input ScoreInput
 }
 
-// RebalanceItem order terjadwal yang mungkin dimajukan.
+// RebalanceItem order baru/terjadwal yang mungkin digeser ke hari H-nya.
 type RebalanceItem struct {
 	ResID, OrderID int64
 	Kode           string

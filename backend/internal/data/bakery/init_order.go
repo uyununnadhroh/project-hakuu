@@ -76,7 +76,7 @@ const (
 	qGetRebalanceItems = `SELECT r.id, o.id, o.kode, r.jumlah, o.waktu_kirim, o.waktu_pesan,
 					DATE_FORMAT(o.hari_deadline,'%Y-%m-%d'), DATE_FORMAT(r.tanggal,'%Y-%m-%d')
 				FROM capacity_reservations r JOIN orders o ON o.id = r.order_id
-				WHERE o.status = 'terjadwal' AND r.tipe = 'tetap' AND r.lembur = 0 AND r.tanggal > ?`
+				WHERE o.status IN ('baru','terjadwal') AND r.tipe = 'tetap' AND r.lembur = 0 AND r.tanggal > ?`
 
 	getRiskOrders  = "GetRiskOrders"
 	qGetRiskOrders = `SELECT id, kode FROM orders WHERE status = 'terjadwal' AND hari_produksi <= ?`

@@ -167,10 +167,12 @@ func (s Service) rebalance(ctx context.Context) error {
 
 // rebalanceOnce dijalankan tiap jam setelah skor dihitung ulang.
 //
-//  1. Memajukan: order di dalam jendela 72 jam diurutkan dari skor tertinggi;
-//     bila ada hari produksi yang lebih awal (dan masih diizinkan) dengan
-//     kapasitas kosong (misalnya karena ada pembatalan), order dipindah ke sana.
+//  1. Menggeser ke hari H: order Baru/Terjadwal (tidak harus sudah masuk jendela
+//     72 jam) berjam kirim >= jam siap (11.00) yang masih diproduksi H-1
+//     dipindah ke hari kirimnya bila kapasitas normal hari H masih cukup, tanpa
+//     menunggu H-1 penuh. H-1 jadi longgar untuk order yang wajib H-1.
 //     Hari yang dikunci (frozen) dan order yang sedang diproduksi tidak disentuh.
+//     Order tidak pernah dimajukan kembali ke H-1 agar tidak bolak-balik.
 //  2. Menandai At risk: order terjadwal yang hari produksinya hari ini (atau
 //     sudah lewat) tetapi belum mulai diproduksi saat jam produksi harian
 //     hampir selesai (WarnHours jam sebelumnya).
@@ -202,37 +204,42 @@ func (s Service) rebalanceOnce(ctx context.Context) error {
 		if it.Cur, err = s.parseDay(it.CurStr); err != nil {
 			return err
 		}
-		if InWindow(it.Deliver, now, set) {
+		// hanya order yang masih punya hari cadangan (hari H) setelah hari produksinya
+		if it.Deadline.After(it.Cur) {
 			it.Score = ComputeScore(bakery.ScoreInput{Qty: it.Qty, DeliverAt: it.Deliver, OrderedAt: it.Order}, now, set).Total
 			items = append(items, it)
 		}
 	}
-	sort.Slice(items, func(i, j int) bool { return items[i].Score > items[j].Score })
+	// Hari dikunci urut naik (hindari deadlock); dalam satu hari skor terendah dulu.
+	sort.SliceStable(items, func(i, j int) bool {
+		if !items[i].Cur.Equal(items[j].Cur) {
+			return items[i].Cur.Before(items[j].Cur)
+		}
+		return items[i].Score < items[j].Score
+	})
 
 	for _, it := range items {
-		for d := EarliestDay(it.Deliver, now, set); d.Before(it.Cur); d = AddDays(d, 1) {
-			st, err := s.getDay(ctx, tx, d, set, now)
-			if err != nil {
-				return err
-			}
-			if st.Locked || st.Free() < it.Qty {
-				continue
-			}
-			if err := s.bakery.UpdateReservationDay(ctx, tx, it.ResID, fmtDay(d)); err != nil {
-				return err
-			}
-			if err := s.bakery.UpdateOrderProductionDay(ctx, tx, it.OrderID, fmtDay(d)); err != nil {
-				return err
-			}
-			if err := s.audit(ctx, tx, it.OrderID, "sistem", "dimajukan",
-				map[string]string{"hari_produksi": fmtDay(it.Cur)}, map[string]string{"hari_produksi": fmtDay(d)},
-				fmt.Sprintf("Ada kapasitas kosong di hari lebih awal (skor %.3f)", it.Score)); err != nil {
-				return err
-			}
-			if err := s.notify(ctx, tx, it.OrderID, fmt.Sprintf("Order %s dimajukan dari %s ke %s.", it.Kode, fmtDay(it.Cur), fmtDay(d))); err != nil {
-				return err
-			}
-			break
+		from, err := s.getDay(ctx, tx, it.Cur, set, now)
+		if err != nil {
+			return err
+		}
+		to, err := s.getDay(ctx, tx, it.Deadline, set, now)
+		if err != nil {
+			return err
+		}
+		if from.Locked || to.Locked || to.Free() < it.Qty {
+			continue
+		}
+		if err := s.bakery.UpdateReservationDay(ctx, tx, it.ResID, fmtDay(it.Deadline)); err != nil {
+			return err
+		}
+		if err := s.bakery.UpdateOrderProductionDay(ctx, tx, it.OrderID, fmtDay(it.Deadline)); err != nil {
+			return err
+		}
+		if err := s.notify(ctx, tx, it.OrderID, fmt.Sprintf(
+			"Order %s digeser dari %s ke %s (hari kirim) agar kapasitas H-1 longgar untuk pesanan yang wajib H-1.",
+			it.Kode, fmtDay(it.Cur), fmtDay(it.Deadline))); err != nil {
+			return err
 		}
 	}
 

@@ -145,7 +145,7 @@ func (d Data) UpdateOrderScore(ctx context.Context, tx *sqlx.Tx, id int64, sc ba
 	return err
 }
 
-// GetRebalanceItems order terjadwal setelah hari ini (Deadline/Cur belum di-parse).
+// GetRebalanceItems order baru/terjadwal yang hari produksinya setelah hari ini (Deadline/Cur belum di-parse).
 func (d Data) GetRebalanceItems(ctx context.Context, tx *sqlx.Tx, today string) ([]bakery.RebalanceItem, error) {
 	rows, err := d.st(ctx, tx, getRebalanceItems).QueryxContext(ctx, today)
 	if err != nil {
