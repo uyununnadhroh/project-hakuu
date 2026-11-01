@@ -331,9 +331,9 @@ func TestRebalanceShiftsToDayH(t *testing.T) {
 
 	var notif, audit int
 	e.db.QueryRow(`SELECT COUNT(*) FROM notifications WHERE order_id=? AND pesan LIKE '%digeser%'`, a.OrderID).Scan(&notif)
-	e.db.QueryRow(`SELECT COUNT(*) FROM audit_log WHERE order_id=? AND aksi IN ('digeser','dimajukan')`, a.OrderID).Scan(&audit)
-	if notif != 1 || audit != 0 {
-		t.Errorf("harus tepat satu notifikasi tanpa audit: notif=%d audit=%d", notif, audit)
+	e.db.QueryRow(`SELECT COUNT(*) FROM audit_log WHERE order_id=? AND aksi='digeser'`, a.OrderID).Scan(&audit)
+	if notif != 1 || audit != 1 {
+		t.Errorf("harus tepat satu notifikasi dan satu audit 'digeser': notif=%d audit=%d", notif, audit)
 	}
 }
 

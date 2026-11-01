@@ -236,6 +236,11 @@ func (s Service) rebalanceOnce(ctx context.Context) error {
 		if err := s.bakery.UpdateOrderProductionDay(ctx, tx, it.OrderID, fmtDay(it.Deadline)); err != nil {
 			return err
 		}
+		if err := s.audit(ctx, tx, it.OrderID, "sistem", "digeser",
+			map[string]string{"hari_produksi": fmtDay(it.Cur)}, map[string]string{"hari_produksi": fmtDay(it.Deadline)},
+			"Jam kirim >= jam siap dan kapasitas hari kirim cukup; H-1 dilonggarkan untuk pesanan yang wajib H-1"); err != nil {
+			return err
+		}
 		if err := s.notify(ctx, tx, it.OrderID, fmt.Sprintf(
 			"Order %s digeser dari %s ke %s (hari kirim) agar kapasitas H-1 longgar untuk pesanan yang wajib H-1.",
 			it.Kode, fmtDay(it.Cur), fmtDay(it.Deadline))); err != nil {
